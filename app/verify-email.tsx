@@ -6,11 +6,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import Text from '@/components/Text';
 
 const VALID_CODE = '123456';
 

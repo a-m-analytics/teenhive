@@ -1,9 +1,10 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import Text from '@/components/Text';
 
 export default function HomeScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome to Neighborly Jobs</Text>
+      <Text style={styles.title}>Welcome to Teen Hive</Text>
       <Text style={styles.subtitle}>You're signed up!</Text>
     </View>
   );

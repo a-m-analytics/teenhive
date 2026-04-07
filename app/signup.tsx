@@ -1,411 +1,507 @@
-import { useAuth } from '@/context/AuthContext';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+  View, Text, TextInput, TouchableOpacity, ScrollView,
+  StyleSheet, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useAuth } from '@/context/AuthContext';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 const SKILLS = ['Babysitting', 'Tutoring', 'Yard Work', 'Pet Care', 'Tech Help', 'Cleaning', 'Errands', 'Car Washing'];
-const AVAIL_OPTIONS = ['Weekdays after school', 'Weekends', 'School holidays', 'Flexible'];
-const SAFETY_ALL = [
-  'I will keep all communication in-app until both parties agree to share contact info',
-  'I will never ask for or share personal addresses until a job is confirmed',
-  'I agree to treat all users with respect',
-];
-const SAFETY_PARENT = ['I confirm I am an adult (18+) and will never ask teens to meet in private locations'];
-const SAFETY_TEEN = ['I will tell a trusted adult about any job I accept'];
+const AVAIL  = ['Weekdays after school', 'Weekends', 'School holidays', 'Flexible'];
+const KIDS_AGES  = ['Under 5', '5–8', '9–12', '13+'];
+const HOME_TYPES = ['House', 'Apartment', 'Townhouse', 'Farm / Rural'];
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-function validateEmail(e: string) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e); }
-function validateName(n: string) { return n.trim().split(/\s+/).length >= 2; }
-function passwordStrength(p: string): { label: string; color: string; pct: number } {
-  const hasLen = p.length >= 8;
-  const hasNum = /\d/.test(p);
-  const hasSpec = /[!@#$%^&*]/.test(p);
-  const score = [hasLen, hasNum, hasSpec].filter(Boolean).length;
-  if (score === 0) return { label: 'Weak', color: '#ef4444', pct: 0.15 };
-  if (score === 1) return { label: 'Weak', color: '#ef4444', pct: 0.33 };
-  if (score === 2) return { label: 'Fair', color: '#f59e0b', pct: 0.66 };
-  return { label: 'Strong', color: '#22c55e', pct: 1 };
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-function FieldError({ msg }: { msg: string }) {
-  if (!msg) return null;
-  return <Text style={s.fieldError}>⚠ {msg}</Text>;
-}
-
-function Checkbox({ checked, onPress, label }: { checked: boolean; onPress: () => void; label: string }) {
-  return (
-    <TouchableOpacity style={s.checkRow} onPress={onPress} activeOpacity={0.7}>
-      <View style={[s.checkBox, checked && s.checkBoxOn]}>
-        {checked && <Text style={s.checkMark}>✓</Text>}
-      </View>
-      <Text style={s.checkLabel}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
-// ─── Main Screen ─────────────────────────────────────────────────────────────
 export default function Signup() {
-  const { role } = useLocalSearchParams<{ role: string }>();
-  const isTeen = role === 'teen';
   const router = useRouter();
+  const { role } = useLocalSearchParams<{ role: string }>();
   const { signUp } = useAuth();
+  const isTeen = role === 'teen';
   const [step, setStep] = useState(1);
 
   // Step 1
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [showPw, setShowPw] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [errs1, setErrs1] = useState<Record<string, string>>({});
+  const [firstName, setFirstName]         = useState('');
+  const [lastName, setLastName]           = useState('');
+  const [email, setEmail]                 = useState('');
+  const [password, setPassword]           = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   // Step 2
-  const [age, setAge] = useState('');
-  const [bio, setBio] = useState('');
-  const [skills, setSkills] = useState<string[]>([]);
-  const [avail, setAvail] = useState<string[]>([]);
-  const [rate, setRate] = useState('');
+  const [age, setAge]               = useState('');
   const [neighborhood, setNeighborhood] = useState('');
-  const [errs2, setErrs2] = useState<Record<string, string>>({});
+  const [bio, setBio]               = useState('');
+  const [hourlyRate, setHourlyRate] = useState('');
+  const [numberOfKids, setNumberOfKids] = useState('');
+  const [skills, setSkills]         = useState<string[]>([]);
+  const [avail, setAvail]           = useState<string[]>([]);
+  const [kidsAges, setKidsAges]     = useState<string[]>([]);
+  const [homeType, setHomeType]     = useState('');
+  const [hasPets, setHasPets]       = useState<boolean | null>(null);
 
   // Step 3
-  const [safetyChecks, setSafetyChecks] = useState<string[]>([]);
+  const [agreed1, setAgreed1] = useState(false);
+  const [agreed2, setAgreed2] = useState(false);
+  const [agreed3, setAgreed3] = useState(false);
+  const [agreed4, setAgreed4] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
-  const [submitError, setSubmitError] = useState('');
 
-  const strength = passwordStrength(password);
-  const hasLen = password.length >= 8;
-  const hasNum = /\d/.test(password);
-  const hasSpec = /[!@#$%^&*]/.test(password);
+  const allChecked = agreed1 && agreed2 && agreed3 && (isTeen || agreed4);
 
-  // ── Step 1 validation ──
-  const validateStep1 = () => {
-    const e: Record<string, string> = {};
-    if (!validateName(name)) e.name = 'Enter your first and last name.';
-    if (!validateEmail(email)) e.email = 'Enter a valid email address.';
-    if (password.length < 8 || !hasNum || !hasSpec) e.password = 'Password must meet all requirements.';
-    if (confirm !== password) e.confirm = 'Passwords do not match.';
-    setErrs1(e);
-    return Object.keys(e).length === 0;
-  };
-
-  // ── Step 2 validation ──
-  const validateStep2 = () => {
-    const e: Record<string, string> = {};
-    const ageNum = parseInt(age, 10);
-    if (isTeen) {
-      if (isNaN(ageNum) || ageNum < 13 || ageNum > 17) e.age = 'You must be between 13 and 17 to sign up as a teen.';
-      if (bio.trim().length < 20) e.bio = 'Bio must be at least 20 characters.';
-      if (skills.length === 0) e.skills = 'Select at least one skill.';
-    } else {
-      if (isNaN(ageNum) || ageNum < 18) e.age = 'You must be 18 or older to sign up as a parent.';
-      if (!neighborhood.trim()) e.neighborhood = 'Enter your neighborhood or area.';
-      if (bio.trim().length < 20) e.bio = 'Bio must be at least 20 characters.';
+  const handleNext = () => {
+    if (step === 1) {
+      if (!firstName.trim() || !lastName.trim() || !email.trim() || !password) {
+        Alert.alert('Missing info', 'Please fill in all fields.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        Alert.alert('Error', 'Passwords do not match.');
+        return;
+      }
+      if (password.length < 8) {
+        Alert.alert('Error', 'Password must be at least 8 characters.');
+        return;
+      }
+      setStep(2);
+    } else if (step === 2) {
+      const ageNum = parseInt(age, 10);
+      if (!age || isNaN(ageNum)) {
+        Alert.alert('Missing info', 'Please enter your age.');
+        return;
+      }
+      if (isTeen && (ageNum < 13 || ageNum > 17)) {
+        Alert.alert('Error', 'Teens must be between 13 and 17 years old.');
+        return;
+      }
+      if (!isTeen && ageNum < 18) {
+        Alert.alert('Error', 'Parents must be 18 or older.');
+        return;
+      }
+      if (!neighborhood.trim()) {
+        Alert.alert('Missing info', 'Please enter your neighborhood.');
+        return;
+      }
+      if (isTeen && skills.length === 0) {
+        Alert.alert('Missing info', 'Please select at least one skill.');
+        return;
+      }
+      setStep(3);
     }
-    setErrs2(e);
-    return Object.keys(e).length === 0;
   };
 
-  // ── Step 3 submit ──
-  const allSafetyItems = [...SAFETY_ALL, ...(isTeen ? SAFETY_TEEN : SAFETY_PARENT)];
-  const allChecked = allSafetyItems.every(item => safetyChecks.includes(item));
-
-  const handleSubmit = async () => {
-    if (!allChecked) return;
-    setSubmitError('');
-    setLoading(true);
-    const { error } = await signUp(email, password, {
-      role: role ?? 'teen',
-      full_name: name,
-      age: parseInt(age, 10),
-      bio,
-      neighborhood: isTeen ? undefined : neighborhood,
-      hourly_rate: isTeen && rate ? parseFloat(rate) : undefined,
-      skills: isTeen ? skills : undefined,
-      availability: isTeen ? avail : undefined,
-    });
-    setLoading(false);
-    if (error) {
-      setSubmitError(error);
+  const handleSignup = async () => {
+    if (!allChecked) {
+      Alert.alert('Please agree', 'Check all boxes to continue.');
       return;
     }
-    setDone(true);
-    setTimeout(() => router.replace('/(tabs)' as any), 1200);
+    setLoading(true);
+    try {
+      const { error } = await signUp(email.trim(), password, {
+        role: role ?? 'teen',
+        full_name: `${firstName.trim()} ${lastName.trim()}`,
+        age: parseInt(age, 10),
+        neighborhood: neighborhood.trim(),
+        bio: bio.trim() || undefined,
+        hourly_rate: isTeen && hourlyRate ? parseFloat(hourlyRate) : undefined,
+        skills: isTeen ? skills : undefined,
+        availability: isTeen ? avail : undefined,
+      });
+      if (error) { Alert.alert('Signup failed', error); return; }
+      router.replace(isTeen ? '/teen-setup' as any : '/(tabs)' as any);
+    } catch (e: any) {
+      Alert.alert('Signup failed', e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const toggleSkill = (sk: string) => setSkills(p => p.includes(sk) ? p.filter(x => x !== sk) : [...p, sk]);
-  const toggleAvail = (a: string) => setAvail(p => p.includes(a) ? p.filter(x => x !== a) : [...p, a]);
-  const toggleSafety = (item: string) => setSafetyChecks(p => p.includes(item) ? p.filter(x => x !== item) : [...p, item]);
-
-  // ── Progress bar ──
-  const progressPct = step === 1 ? 0.33 : step === 2 ? 0.66 : 1;
-
-  // ── Success screen ──
-  if (done) {
-    return (
-      <View style={s.successScreen}>
-        <Text style={s.successIcon}>✅</Text>
-        <Text style={s.successTitle}>Account Created!</Text>
-        <Text style={s.successSub}>Taking you to Neighborly Jobs...</Text>
-      </View>
-    );
-  }
+  const toggleArr = (arr: string[], val: string, set: (v: string[]) => void) => {
+    set(arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]);
+  };
 
   return (
-    <KeyboardAvoidingView style={s.root} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      {/* Progress */}
-      <View style={s.progressWrap}>
-        <TouchableOpacity onPress={() => step > 1 ? setStep(s => s - 1) : router.back()} style={s.backBtn}>
-          <Text style={s.backText}>←</Text>
-        </TouchableOpacity>
-        <View style={s.progressBar}>
-          <View style={[s.progressFill, { width: `${progressPct * 100}%` as any }]} />
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView
+        style={s.container}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: 120 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <View style={s.header}>
+          <TouchableOpacity onPress={() => step > 1 ? setStep(step - 1) : router.back()}>
+            <Text style={s.back}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={s.logo}>TeenHive</Text>
+          <Text style={s.stepText}>STEP {step < 10 ? '0' + step : step} OF 03</Text>
         </View>
-        <Text style={s.stepLabel}>Step {step} of 3</Text>
-      </View>
 
-      <ScrollView contentContainerStyle={s.container} keyboardShouldPersistTaps="handled">
+        {/* Progress bar */}
+        <View style={s.progressBg}>
+          <View style={[s.progressFill, { width: step === 1 ? '33%' : step === 2 ? '66%' : '100%' }]} />
+        </View>
 
         {/* ── STEP 1 ── */}
         {step === 1 && (
-          <>
-            <Text style={s.title}>Basic Info</Text>
-            <Text style={s.sub}>Signing up as a {isTeen ? 'Teen' : 'Parent'}</Text>
+          <View style={s.form}>
+            <Text style={s.title}>Let's get you set up.</Text>
+            <Text style={s.subtitle}>This takes about 2 minutes.</Text>
 
-            <Text style={s.label}>Full Name</Text>
-            <TextInput style={[s.input, errs1.name && s.inputErr]} placeholder="First and last name" placeholderTextColor="#94a3b8" value={name} onChangeText={v => { setName(v); setErrs1(e => ({ ...e, name: '' })); }} />
-            <FieldError msg={errs1.name} />
-
-            <Text style={s.label}>Email</Text>
-            <TextInput style={[s.input, errs1.email && s.inputErr]} placeholder="you@example.com" placeholderTextColor="#94a3b8" value={email} onChangeText={v => { setEmail(v); setErrs1(e => ({ ...e, email: '' })); }} autoCapitalize="none" keyboardType="email-address" />
-            <FieldError msg={errs1.email} />
-
-            <Text style={s.label}>Password</Text>
-            <View style={[s.pwRow, errs1.password && s.inputErr]}>
-              <TextInput style={s.pwInput} placeholder="Create a password" placeholderTextColor="#94a3b8" value={password} onChangeText={v => { setPassword(v); setErrs1(e => ({ ...e, password: '' })); }} secureTextEntry={!showPw} />
-              <TouchableOpacity onPress={() => setShowPw(p => !p)} style={s.eyeBtn}><Text style={s.eyeIcon}>{showPw ? '🙈' : '👁'}</Text></TouchableOpacity>
+            <View style={s.row}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.label}>FIRST NAME</Text>
+                <TextInput
+                  style={s.input}
+                  value={firstName}
+                  onChangeText={(t) => setFirstName(t)}
+                  placeholder="First"
+                  placeholderTextColor="#9ca3af"
+                  autoCapitalize="words"
+                  autoComplete="off"
+                  textContentType="none"
+                  importantForAutofill="no"
+                  returnKeyType="next"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.label}>LAST NAME</Text>
+                <TextInput
+                  style={s.input}
+                  value={lastName}
+                  onChangeText={(t) => setLastName(t)}
+                  placeholder="Last"
+                  placeholderTextColor="#9ca3af"
+                  autoCapitalize="words"
+                  autoComplete="off"
+                  textContentType="none"
+                  importantForAutofill="no"
+                  returnKeyType="next"
+                />
+              </View>
             </View>
-            {password.length > 0 && (
-              <>
-                <View style={s.strengthRow}>
-                  <View style={s.strengthBar}><View style={[s.strengthFill, { width: `${strength.pct * 100}%` as any, backgroundColor: strength.color }]} /></View>
-                  <Text style={[s.strengthLabel, { color: strength.color }]}>{strength.label}</Text>
-                </View>
-                <View style={s.reqList}>
-                  <Text style={[s.req, hasLen && s.reqMet]}>{'  '}{hasLen ? '✓' : '○'} 8+ characters</Text>
-                  <Text style={[s.req, hasNum && s.reqMet]}>{'  '}{hasNum ? '✓' : '○'} One number</Text>
-                  <Text style={[s.req, hasSpec && s.reqMet]}>{'  '}{hasSpec ? '✓' : '○'} One special character (!@#$%)</Text>
-                </View>
-              </>
-            )}
-            <FieldError msg={errs1.password} />
 
-            <Text style={s.label}>Confirm Password</Text>
-            <View style={[s.pwRow, errs1.confirm && s.inputErr]}>
-              <TextInput style={s.pwInput} placeholder="Repeat password" placeholderTextColor="#94a3b8" value={confirm} onChangeText={v => { setConfirm(v); setErrs1(e => ({ ...e, confirm: '' })); }} secureTextEntry={!showConfirm} />
-              <TouchableOpacity onPress={() => setShowConfirm(p => !p)} style={s.eyeBtn}><Text style={s.eyeIcon}>{showConfirm ? '🙈' : '👁'}</Text></TouchableOpacity>
-            </View>
-            <FieldError msg={errs1.confirm} />
+            <Text style={s.label}>EMAIL</Text>
+            <TextInput
+              style={s.input}
+              value={email}
+              onChangeText={(t) => setEmail(t)}
+              placeholder="you@example.com"
+              placeholderTextColor="#9ca3af"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="off"
+              textContentType="none"
+              importantForAutofill="no"
+              returnKeyType="next"
+            />
 
-            <TouchableOpacity style={s.nextBtn} onPress={() => validateStep1() && setStep(2)}>
-              <Text style={s.nextBtnText}>Next →</Text>
-            </TouchableOpacity>
-          </>
+            <Text style={s.label}>PASSWORD</Text>
+            <TextInput
+              style={s.input}
+              value={password}
+              onChangeText={(t) => setPassword(t)}
+              placeholder="At least 8 characters"
+              placeholderTextColor="#9ca3af"
+              secureTextEntry={true}
+              autoComplete="off"
+              textContentType="none"
+              importantForAutofill="no"
+              returnKeyType="next"
+            />
+
+            <Text style={s.label}>CONFIRM PASSWORD</Text>
+            <TextInput
+              style={s.input}
+              value={confirmPassword}
+              onChangeText={(t) => setConfirmPassword(t)}
+              placeholder="Repeat password"
+              placeholderTextColor="#9ca3af"
+              secureTextEntry={true}
+              autoComplete="off"
+              textContentType="none"
+              importantForAutofill="no"
+              returnKeyType="done"
+            />
+          </View>
         )}
 
         {/* ── STEP 2 ── */}
         {step === 2 && (
-          <>
-            <Text style={s.title}>Your Profile</Text>
-            <Text style={s.sub}>{isTeen ? 'Tell parents what you can do' : 'Tell teens about your family'}</Text>
+          <View style={s.form}>
+            <Text style={s.title}>{isTeen ? 'About you.' : 'Your family.'}</Text>
+            <Text style={s.subtitle}>{isTeen ? 'Help parents know who you are.' : 'Help teens understand your needs.'}</Text>
 
-            <Text style={s.label}>Your Age</Text>
-            <TextInput style={[s.input, errs2.age && s.inputErr]} placeholder={isTeen ? '13–17' : '18+'} placeholderTextColor="#94a3b8" value={age} onChangeText={v => { setAge(v); setErrs2(e => ({ ...e, age: '' })); }} keyboardType="number-pad" />
-            <FieldError msg={errs2.age} />
+            <Text style={s.label}>AGE</Text>
+            <TextInput
+              style={s.input}
+              value={age}
+              onChangeText={(t) => setAge(t.replace(/\D/g, ''))}
+              placeholder={isTeen ? 'e.g. 15' : 'e.g. 35'}
+              placeholderTextColor="#9ca3af"
+              keyboardType="number-pad"
+              maxLength={2}
+              autoComplete="off"
+              textContentType="none"
+              importantForAutofill="no"
+              returnKeyType="next"
+            />
 
-            {!isTeen && (
-              <>
-                <Text style={s.label}>Neighborhood / Area</Text>
-                <TextInput style={[s.input, errs2.neighborhood && s.inputErr]} placeholder="e.g. Maplewood, NJ" placeholderTextColor="#94a3b8" value={neighborhood} onChangeText={v => { setNeighborhood(v); setErrs2(e => ({ ...e, neighborhood: '' })); }} />
-                <FieldError msg={errs2.neighborhood} />
-              </>
-            )}
+            <Text style={s.label}>NEIGHBORHOOD</Text>
+            <TextInput
+              style={s.input}
+              value={neighborhood}
+              onChangeText={(t) => setNeighborhood(t)}
+              placeholder="e.g. Maplewood, NJ"
+              placeholderTextColor="#9ca3af"
+              autoCapitalize="words"
+              autoComplete="off"
+              textContentType="none"
+              importantForAutofill="no"
+              returnKeyType="next"
+            />
 
-            <View style={s.bioLabelRow}>
-              <Text style={s.label}>{isTeen ? 'What can you do?' : 'About your family'}</Text>
-              <Text style={s.counter}>{bio.length}/200</Text>
-            </View>
-            <TextInput style={[s.textArea, errs2.bio && s.inputErr]} placeholder={isTeen ? 'Describe your experience and why you\'re reliable...' : 'Tell teens what kind of jobs you post and about your household...'} placeholderTextColor="#94a3b8" value={bio} onChangeText={v => { setBio(v.slice(0, 200)); setErrs2(e => ({ ...e, bio: '' })); }} multiline />
-            <FieldError msg={errs2.bio} />
+            <Text style={s.label}>{isTeen ? 'ABOUT YOU' : 'ABOUT YOUR FAMILY'} <Text style={{ color: '#9ca3af', fontWeight: '400' }}>(optional)</Text></Text>
+            <TextInput
+              style={[s.input, s.textArea]}
+              value={bio}
+              onChangeText={(t) => setBio(t)}
+              placeholder={isTeen ? 'Tell parents a bit about yourself...' : 'Tell teens about your family...'}
+              placeholderTextColor="#9ca3af"
+              multiline={true}
+              autoComplete="off"
+              textContentType="none"
+              importantForAutofill="no"
+            />
 
             {isTeen && (
               <>
-                <Text style={s.label}>Skills <Text style={s.required}>(pick at least 1)</Text></Text>
-                <View style={s.chipGrid}>
-                  {SKILLS.map(sk => (
-                    <TouchableOpacity key={sk} style={[s.chip, skills.includes(sk) && s.chipOn]} onPress={() => { toggleSkill(sk); setErrs2(e => ({ ...e, skills: '' })); }}>
-                      <Text style={[s.chipText, skills.includes(sk) && s.chipTextOn]}>{sk}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <FieldError msg={errs2.skills} />
+                <Text style={s.label}>HOURLY RATE <Text style={{ color: '#9ca3af', fontWeight: '400' }}>(optional)</Text></Text>
+                <TextInput
+                  style={s.input}
+                  value={hourlyRate}
+                  onChangeText={(t) => setHourlyRate(t.replace(/[^0-9.]/g, ''))}
+                  placeholder="e.g. 15"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="decimal-pad"
+                  autoComplete="off"
+                  textContentType="none"
+                  importantForAutofill="no"
+                  returnKeyType="done"
+                />
 
-                <Text style={s.label}>Availability</Text>
-                <View style={s.chipGrid}>
-                  {AVAIL_OPTIONS.map(a => (
-                    <TouchableOpacity key={a} style={[s.chip, avail.includes(a) && s.chipOn]} onPress={() => toggleAvail(a)}>
-                      <Text style={[s.chipText, avail.includes(a) && s.chipTextOn]}>{a}</Text>
-                    </TouchableOpacity>
-                  ))}
+                <Text style={s.label}>YOUR SKILLS</Text>
+                <View style={s.chips}>
+                  {SKILLS.map(sk => {
+                    const on = skills.includes(sk);
+                    return (
+                      <TouchableOpacity
+                        key={sk}
+                        style={[s.chip, on && s.chipOn]}
+                        onPress={() => toggleArr(skills, sk, setSkills)}
+                      >
+                        <Text style={[s.chipText, on && s.chipTextOn]}>{sk}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
 
-                <Text style={s.label}>Hourly Rate</Text>
-                <View style={s.rateRow}>
-                  <Text style={s.ratePrefix}>$</Text>
-                  <TextInput style={s.rateInput} placeholder="15" placeholderTextColor="#94a3b8" value={rate} onChangeText={setRate} keyboardType="number-pad" />
-                  <Text style={s.rateSuffix}>/hr</Text>
+                <Text style={s.label}>AVAILABILITY</Text>
+                <View style={s.chips}>
+                  {AVAIL.map(a => {
+                    const on = avail.includes(a);
+                    return (
+                      <TouchableOpacity
+                        key={a}
+                        style={[s.chip, on && s.chipOn]}
+                        onPress={() => toggleArr(avail, a, setAvail)}
+                      >
+                        <Text style={[s.chipText, on && s.chipTextOn]}>{a}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </>
             )}
 
-            <TouchableOpacity style={s.nextBtn} onPress={() => validateStep2() && setStep(3)}>
-              <Text style={s.nextBtnText}>Next →</Text>
-            </TouchableOpacity>
-          </>
+            {!isTeen && (
+              <>
+                <Text style={s.label}>NUMBER OF KIDS <Text style={{ color: '#9ca3af', fontWeight: '400' }}>(optional)</Text></Text>
+                <TextInput
+                  style={s.input}
+                  value={numberOfKids}
+                  onChangeText={(t) => setNumberOfKids(t.replace(/\D/g, ''))}
+                  placeholder="e.g. 2"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="number-pad"
+                  maxLength={2}
+                  autoComplete="off"
+                  textContentType="none"
+                  importantForAutofill="no"
+                  returnKeyType="next"
+                />
+
+                <Text style={s.label}>KIDS' AGE GROUPS <Text style={{ color: '#9ca3af', fontWeight: '400' }}>(optional)</Text></Text>
+                <View style={s.chips}>
+                  {KIDS_AGES.map(a => {
+                    const on = kidsAges.includes(a);
+                    return (
+                      <TouchableOpacity
+                        key={a}
+                        style={[s.chip, on && s.chipOn]}
+                        onPress={() => toggleArr(kidsAges, a, setKidsAges)}
+                      >
+                        <Text style={[s.chipText, on && s.chipTextOn]}>{a}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <Text style={s.label}>HOME TYPE <Text style={{ color: '#9ca3af', fontWeight: '400' }}>(optional)</Text></Text>
+                <View style={s.chips}>
+                  {HOME_TYPES.map(h => {
+                    const on = homeType === h;
+                    return (
+                      <TouchableOpacity
+                        key={h}
+                        style={[s.chip, on && s.chipOn]}
+                        onPress={() => setHomeType(h)}
+                      >
+                        <Text style={[s.chipText, on && s.chipTextOn]}>{h}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <Text style={s.label}>PETS?</Text>
+                <View style={s.row}>
+                  {[{ label: 'Yes', val: true }, { label: 'No', val: false }].map(opt => {
+                    const on = hasPets === opt.val;
+                    return (
+                      <TouchableOpacity
+                        key={opt.label}
+                        style={[s.chip, on && s.chipOn, { flex: 1, alignItems: 'center' }]}
+                        onPress={() => setHasPets(opt.val)}
+                      >
+                        <Text style={[s.chipText, on && s.chipTextOn]}>{opt.label}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
+          </View>
         )}
 
         {/* ── STEP 3 ── */}
         {step === 3 && (
-          <>
-            <View style={s.shieldWrap}>
-              <Text style={s.shieldIcon}>🛡️</Text>
+          <View style={s.form}>
+            <Text style={s.title}>Almost done.</Text>
+            <Text style={s.subtitle}>A few things to keep everyone safe.</Text>
+
+            {[
+              { state: agreed1, set: setAgreed1, text: 'I will keep all communication in-app until both parties agree to meet in person.' },
+              { state: agreed2, set: setAgreed2, text: 'I will never share personal addresses until a job is confirmed.' },
+              { state: agreed3, set: setAgreed3, text: 'I agree to treat all users with respect.' },
+              ...(!isTeen ? [{ state: agreed4, set: setAgreed4, text: 'I confirm I am an adult (18+) and will supervise all interactions.' }] : []),
+            ].map(({ state, set, text }, i) => (
+              <TouchableOpacity key={i} style={s.checkRow} onPress={() => set(!state)}>
+                <View style={[s.checkbox, state && s.checkboxChecked]}>
+                  {state && <Text style={s.checkmark}>✓</Text>}
+                </View>
+                <Text style={s.checkText}>{text}</Text>
+              </TouchableOpacity>
+            ))}
+
+            <View style={{ backgroundColor: '#eef6ef', borderRadius: 12, padding: 16, marginTop: 8 }}>
+              <Text style={{ fontSize: 13, color: '#737972', lineHeight: 20 }}>
+                By creating an account you agree to our{' '}
+                <Text style={{ color: '#735c00', fontWeight: '600' }} onPress={() => router.push('/terms' as any)}>Terms of Service</Text>
+                {' and '}
+                <Text style={{ color: '#735c00', fontWeight: '600' }} onPress={() => router.push('/privacy' as any)}>Privacy Policy</Text>.
+              </Text>
             </View>
-            <Text style={s.title}>Keep Everyone Safe</Text>
-            <Text style={s.sub}>Please read and agree to these before joining</Text>
-
-            <View style={s.safetyCard}>
-              {allSafetyItems.map(item => (
-                <Checkbox key={item} checked={safetyChecks.includes(item)} onPress={() => toggleSafety(item)} label={item} />
-              ))}
-            </View>
-
-            <View style={s.emailNotice}>
-              <Text style={s.emailNoticeIcon}>📧</Text>
-              <Text style={s.emailNoticeText}>We'll send a verification email to <Text style={s.emailBold}>{email}</Text> before you can apply to jobs.</Text>
-            </View>
-
-            {submitError ? <Text style={s.fieldError}>⚠ {submitError}</Text> : null}
-
-            <TouchableOpacity
-              style={[s.submitBtn, (!allChecked || loading) && s.submitBtnDisabled]}
-              onPress={handleSubmit}
-              disabled={!allChecked || loading}
-            >
-              {loading
-                ? <ActivityIndicator color="#fff" />
-                : <Text style={s.submitBtnText}>Create Account</Text>
-              }
-            </TouchableOpacity>
-
-            {!allChecked && <Text style={s.safetyError}>Please agree to all safety guidelines above.</Text>}
-          </>
+          </View>
         )}
 
-        <View style={{ height: 40 }} />
+        {/* Button */}
+        <TouchableOpacity
+          style={[s.button, (loading || (step === 3 && !allChecked)) && { opacity: 0.5 }]}
+          onPress={step < 3 ? handleNext : handleSignup}
+          disabled={loading || (step === 3 && !allChecked)}
+        >
+          <Text style={s.buttonText}>
+            {loading ? 'Creating account...' : step < 3 ? 'NEXT STEP' : 'CREATE ACCOUNT'}
+          </Text>
+        </TouchableOpacity>
+
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff' },
-
-  progressWrap: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16, gap: 10 },
-  backBtn: { paddingRight: 4 },
-  backText: { fontSize: 22, color: '#22c55e', fontWeight: '700' },
-  progressBar: { flex: 1, height: 6, backgroundColor: '#e2e8f0', borderRadius: 3, overflow: 'hidden' },
-  progressFill: { height: 6, backgroundColor: '#22c55e', borderRadius: 3 },
-  stepLabel: { fontSize: 12, color: '#64748b', fontWeight: '600', minWidth: 50, textAlign: 'right' },
-
-  container: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 32 },
-
-  title: { fontSize: 26, fontWeight: '800', color: '#0f172a', marginBottom: 4 },
-  sub: { fontSize: 14, color: '#64748b', marginBottom: 24 },
-
-  label: { fontSize: 14, fontWeight: '700', color: '#0f172a', marginTop: 16, marginBottom: 8 },
-  required: { fontWeight: '400', color: '#94a3b8' },
-  bioLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 16, marginBottom: 8 },
-  counter: { fontSize: 12, color: '#94a3b8' },
-
-  input: { borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: '#0f172a', backgroundColor: '#f8fafc' },
-  inputErr: { borderColor: '#f87171' },
-  textArea: { borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 12, padding: 14, fontSize: 14, color: '#0f172a', backgroundColor: '#f8fafc', minHeight: 100, textAlignVertical: 'top' },
-  fieldError: { color: '#dc2626', fontSize: 13, marginTop: 4, marginBottom: 2 },
-
-  pwRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 12, backgroundColor: '#f8fafc' },
-  pwInput: { flex: 1, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, color: '#0f172a' },
-  eyeBtn: { paddingHorizontal: 14 },
-  eyeIcon: { fontSize: 18 },
-
-  strengthRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
-  strengthBar: { flex: 1, height: 5, backgroundColor: '#e2e8f0', borderRadius: 3, overflow: 'hidden' },
-  strengthFill: { height: 5, borderRadius: 3 },
-  strengthLabel: { fontSize: 12, fontWeight: '700', minWidth: 44 },
-  reqList: { marginTop: 6, gap: 3 },
-  req: { fontSize: 13, color: '#94a3b8' },
-  reqMet: { color: '#22c55e', fontWeight: '600' },
-
-  chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#f8fafc' },
-  chipOn: { backgroundColor: '#22c55e', borderColor: '#22c55e' },
-  chipText: { fontSize: 13, fontWeight: '600', color: '#64748b' },
-  chipTextOn: { color: '#fff' },
-
-  rateRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  ratePrefix: { fontSize: 20, fontWeight: '700', color: '#0f172a' },
-  rateInput: { borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 10, padding: 12, fontSize: 20, fontWeight: '700', width: 80, textAlign: 'center', color: '#22c55e', backgroundColor: '#f8fafc' },
-  rateSuffix: { fontSize: 15, color: '#64748b' },
-
-  nextBtn: { backgroundColor: '#22c55e', borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 28 },
-  nextBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
-
-  shieldWrap: { alignItems: 'center', marginBottom: 8, marginTop: 8 },
-  shieldIcon: { fontSize: 56 },
-  safetyCard: { backgroundColor: '#f8fafc', borderRadius: 16, padding: 16, gap: 14, marginBottom: 20 },
-  checkRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  checkBox: { width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: '#e2e8f0', justifyContent: 'center', alignItems: 'center', marginTop: 1, flexShrink: 0 },
-  checkBoxOn: { backgroundColor: '#22c55e', borderColor: '#22c55e' },
-  checkMark: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  checkLabel: { flex: 1, fontSize: 14, color: '#0f172a', lineHeight: 21 },
-
-  emailNotice: { flexDirection: 'row', gap: 10, backgroundColor: '#f0fdf4', borderRadius: 12, padding: 14, marginBottom: 20, alignItems: 'flex-start' },
-  emailNoticeIcon: { fontSize: 18 },
-  emailNoticeText: { flex: 1, fontSize: 13, color: '#475569', lineHeight: 20 },
-  emailBold: { fontWeight: '700', color: '#0f172a' },
-
-  submitBtn: { backgroundColor: '#22c55e', borderRadius: 14, padding: 17, alignItems: 'center' },
-  submitBtnDisabled: { opacity: 0.45 },
-  submitBtnText: { color: '#fff', fontSize: 17, fontWeight: '800' },
-  safetyError: { color: '#dc2626', fontSize: 13, textAlign: 'center', marginTop: 10 },
-
-  successScreen: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', gap: 12 },
-  successIcon: { fontSize: 72 },
-  successTitle: { fontSize: 28, fontWeight: '800', color: '#0f172a' },
-  successSub: { fontSize: 15, color: '#64748b' },
+  container: {
+    flex: 1,
+    backgroundColor: '#f3fbf4',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 60,
+    paddingBottom: 16,
+  },
+  back: { color: '#735c00', fontSize: 14, fontWeight: '600' },
+  logo: { fontSize: 18, fontWeight: '700', fontStyle: 'italic', color: '#051b0e' },
+  stepText: { fontSize: 11, color: '#735c00', fontWeight: '700', letterSpacing: 1 },
+  progressBg: {
+    height: 3, backgroundColor: '#e8f0e9',
+    marginHorizontal: 24, borderRadius: 2, marginBottom: 32,
+  },
+  progressFill: { height: 3, backgroundColor: '#735c00', borderRadius: 2 },
+  form: { paddingHorizontal: 24 },
+  title: { fontSize: 32, fontWeight: '700', fontStyle: 'italic', color: '#051b0e', marginBottom: 8 },
+  subtitle: { fontSize: 15, color: '#737972', marginBottom: 32 },
+  row: { flexDirection: 'row', gap: 12 },
+  label: {
+    fontSize: 11, fontWeight: '700', color: '#434843',
+    letterSpacing: 1.5, marginBottom: 8, marginTop: 20,
+  },
+  input: {
+    backgroundColor: '#eef6ef',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: '#161d19',
+  },
+  textArea: {
+    height: 120,
+    textAlignVertical: 'top',
+    paddingTop: 16,
+  },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    borderWidth: 1.5, borderColor: '#c3c8c1', borderRadius: 9999,
+    paddingHorizontal: 16, paddingVertical: 8,
+    backgroundColor: '#ffffff',
+  },
+  chipOn: { borderColor: '#735c00', backgroundColor: '#fed65b' },
+  chipText: { fontSize: 13, fontWeight: '600', color: '#434843' },
+  chipTextOn: { color: '#051b0e' },
+  button: {
+    backgroundColor: '#051b0e',
+    marginHorizontal: 24, marginTop: 32,
+    borderRadius: 100, paddingVertical: 18, alignItems: 'center',
+  },
+  buttonText: { color: '#ffffff', fontSize: 15, fontWeight: '700', letterSpacing: 1 },
+  checkRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16, marginTop: 4 },
+  checkbox: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 2,
+    borderColor: '#c3c8c1', alignItems: 'center', justifyContent: 'center',
+    marginTop: 2, flexShrink: 0,
+  },
+  checkboxChecked: { backgroundColor: '#735c00', borderColor: '#735c00' },
+  checkmark: { color: 'white', fontSize: 13, fontWeight: '700' },
+  checkText: { flex: 1, fontSize: 14, color: '#434843', lineHeight: 20 },
 });

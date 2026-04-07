@@ -1,13 +1,17 @@
-import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
-import { View } from 'react-native';
+import { SignedIn, SignedOut, SignIn } from '@clerk/clerk-expo';
+import { View, Text } from 'react-native';
 
 export default function Index() {
-  const router = useRouter();
-
-  useEffect(() => {
-    // This project is a scaffold — redirect or add screens here
-  }, []);
-
-  return <View style={{ flex: 1, backgroundColor: '#fff' }} />;
+  return (
+    <View style={{ flex: 1 }}>
+      <SignedIn>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text>Welcome! You're signed in.</Text>
+        </View>
+      </SignedIn>
+      <SignedOut>
+        <SignIn />
+      </SignedOut>
+    </View>
+  );
 }

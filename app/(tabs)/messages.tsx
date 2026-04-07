@@ -1,55 +1,199 @@
-import { useRouter } from 'expo-router';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Text from '@/components/Text';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { ActivityIndicator, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
 
-const CONVOS = [
-  { id: '1', name: 'Sarah M.', initials: 'SM', preview: 'Sounds great, see you Saturday!', time: '2m ago', unread: true },
-  { id: '2', name: 'Tom B.', initials: 'TB', preview: 'Can you come by at 4pm?', time: '1h ago', unread: true },
-  { id: '3', name: 'Jordan M.', initials: 'JM', preview: 'I accepted the job!', time: '3h ago', unread: false },
-  { id: '4', name: 'Lisa K.', initials: 'LK', preview: 'Thanks for applying!', time: 'Yesterday', unread: false },
-];
+type Conversation = {
+  id: string;
+  other_id: string;
+  other_name: string;
+  last_message: string;
+  last_message_at: string;
+  unread_count: number;
+};
+
+function getInitials(name: string): string {
+  return (name || 'U').split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function timeAgo(dateStr: string): string {
+  try {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    if (days < 7) return `${days}d ago`;
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch {
+    return '';
+  }
+}
 
 export default function MessagesTab() {
+  const { user } = useAuth();
   const router = useRouter();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  const fetchConversations = useCallback(async () => {
+    if (!user) { setLoading(false); return; }
+    setLoading(true);
+
+    // Get all messages involving this user, grouped by conversation partner
+    const { data: msgs } = await supabase
+      .from('messages')
+      .select('id, sender_id, receiver_id, content, created_at, read, sender:profiles!sender_id(full_name), receiver:profiles!receiver_id(full_name)')
+      .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+      .order('created_at', { ascending: false });
+
+    if (!msgs) { setLoading(false); return; }
+
+    // Group by conversation partner
+    const convMap = new Map<string, Conversation>();
+    for (const msg of msgs) {
+      const isMe = msg.sender_id === user.id;
+      const otherId = isMe ? msg.receiver_id : msg.sender_id;
+      const otherProfile = isMe ? (msg.receiver as any) : (msg.sender as any);
+      const otherName = otherProfile?.full_name ?? 'Unknown';
+
+      if (!convMap.has(otherId)) {
+        convMap.set(otherId, {
+          id: otherId,
+          other_id: otherId,
+          other_name: otherName,
+          last_message: msg.content,
+          last_message_at: msg.created_at,
+          unread_count: !isMe && !msg.read ? 1 : 0,
+        });
+      } else {
+        const existing = convMap.get(otherId)!;
+        if (!isMe && !msg.read) {
+          existing.unread_count += 1;
+        }
+      }
+    }
+
+    setConversations(Array.from(convMap.values()));
+    setLoading(false);
+  }, [user]);
+
+  useFocusEffect(useCallback(() => { fetchConversations(); }, [fetchConversations]));
+
+  const filtered = conversations.filter((c) =>
+    c.other_name.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
-    <View style={s.container}>
-      <Text style={s.header}>Messages</Text>
-      <FlatList
-        data={CONVOS}
-        keyExtractor={c => c.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={s.row} onPress={() => router.push(`/chat?id=${item.id}&name=${item.name}`)}>
-            <View style={s.circle}>
-              <Text style={s.initials}>{item.initials}</Text>
-            </View>
-            <View style={s.content}>
-              <View style={s.rowTop}>
-                <Text style={[s.name, item.unread && s.nameBold]}>{item.name}</Text>
-                <Text style={s.time}>{item.time}</Text>
+    <View style={{ flex: 1, backgroundColor: '#fff', paddingTop: 56 }}>
+      {/* Header */}
+      <Text style={{ fontSize: 26, fontWeight: '700', color: '#111', paddingHorizontal: 24, marginBottom: 16 }}>
+        Messages
+      </Text>
+
+      {/* Search */}
+      <View style={{ marginHorizontal: 24, marginBottom: 16 }}>
+        <TextInput
+          style={{
+            borderWidth: 1,
+            borderColor: '#e5e5e5',
+            borderRadius: 8,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            fontSize: 15,
+            color: '#111',
+            backgroundColor: '#fafafa',
+          }}
+          placeholder="Search conversations..."
+          placeholderTextColor="#aaa"
+          value={search}
+          onChangeText={setSearch}
+        />
+      </View>
+
+      {loading ? (
+        <ActivityIndicator size="small" color="#22c55e" style={{ marginTop: 40 }} />
+      ) : filtered.length === 0 ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 15, color: '#888', textAlign: 'center', paddingHorizontal: 40 }}>
+            {search ? 'No conversations match your search.' : 'No messages yet.'}
+          </Text>
+        </View>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {filtered.map((conv, i) => (
+            <TouchableOpacity
+              key={conv.id}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 24,
+                paddingVertical: 14,
+                borderBottomWidth: 1,
+                borderBottomColor: '#f0f0f0',
+              }}
+              onPress={() => router.push(`/chat?id=${conv.other_id}&name=${encodeURIComponent(conv.other_name)}` as any)}
+            >
+              {/* Avatar */}
+              <View
+                style={{
+                  width: 50,
+                  height: 50,
+                  borderRadius: 25,
+                  backgroundColor: '#f0f0f0',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginRight: 14,
+                }}
+              >
+                <Text style={{ fontSize: 17, fontWeight: '700', color: '#555' }}>
+                  {getInitials(conv.other_name)}
+                </Text>
               </View>
-              <Text style={[s.preview, item.unread && s.previewBold]} numberOfLines={1}>{item.preview}</Text>
-            </View>
-            {item.unread && <View style={s.dot} />}
-          </TouchableOpacity>
-        )}
-        ItemSeparatorComponent={() => <View style={s.divider} />}
-      />
+
+              {/* Content */}
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
+                  <Text style={{ fontSize: 15, fontWeight: conv.unread_count > 0 ? '700' : '500', color: '#111' }}>
+                    {conv.other_name}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#aaa' }}>{timeAgo(conv.last_message_at)}</Text>
+                </View>
+                <Text
+                  numberOfLines={1}
+                  style={{ fontSize: 13, color: conv.unread_count > 0 ? '#555' : '#aaa', fontWeight: conv.unread_count > 0 ? '500' : '400' }}
+                >
+                  {conv.last_message}
+                </Text>
+              </View>
+
+              {/* Unread dot */}
+              {conv.unread_count > 0 && (
+                <View
+                  style={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: 10,
+                    backgroundColor: '#22c55e',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    marginLeft: 10,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, color: '#fff', fontWeight: '700' }}>
+                    {conv.unread_count > 9 ? '9+' : conv.unread_count}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', paddingTop: 56 },
-  header: { fontSize: 24, fontWeight: '800', color: '#0f172a', paddingHorizontal: 20, marginBottom: 16 },
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14 },
-  circle: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#dcfce7', justifyContent: 'center', alignItems: 'center', marginRight: 14 },
-  initials: { color: '#16a34a', fontWeight: '700', fontSize: 17 },
-  content: { flex: 1 },
-  rowTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 },
-  name: { fontWeight: '500', fontSize: 15, color: '#0f172a' },
-  nameBold: { fontWeight: '700' },
-  time: { fontSize: 12, color: '#94a3b8' },
-  preview: { fontSize: 13, color: '#94a3b8' },
-  previewBold: { color: '#64748b', fontWeight: '500' },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#22c55e', marginLeft: 8 },
-  divider: { height: 1, backgroundColor: '#f1f5f9', marginLeft: 84 },
-});

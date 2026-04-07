@@ -1,19 +1,21 @@
+import GradientButton from '@/components/GradientButton';
 import { useAuth } from '@/context/AuthContext';
+import { ds, dsField, dsLabel } from '@/lib/design';
 import { supabase } from '@/lib/supabase';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
+  ScrollView, Switch, Text, TextInput, TouchableOpacity, View,
+} from 'react-native';
 
 const CATEGORIES = ['Babysitting', 'Tutoring', 'Yard Work', 'Pet Care', 'Tech Help', 'Cleaning', 'Errands'];
 const FREQUENCIES = ['Weekly', 'Bi-weekly', 'Monthly'];
-const CAT_COLORS: Record<string, string> = {
-  Babysitting: '#ec4899', Tutoring: '#3b82f6', 'Yard Work': '#22c55e',
-  'Pet Care': '#f59e0b', 'Tech Help': '#8b5cf6', Cleaning: '#06b6d4', Errands: '#f97316',
-};
 
 export default function PostJob() {
   const router = useRouter();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
@@ -29,230 +31,279 @@ export default function PostJob() {
   const [teensNeeded, setTeensNeeded] = useState(1);
   const [submitting, setSubmitting] = useState(false);
 
-  const payLabel = payAmount ? `$${payAmount}${payType === 'hr' ? '/hr' : ' flat'}` : '—';
-  const displayName = profile?.full_name ?? '';
-  const initials = displayName ? displayName.split(' ').map((w: string) => w[0]).join('').toUpperCase() : 'P';
-  const catColor = CAT_COLORS[category] || '#22c55e';
-
   const submit = async () => {
-    if (!title || !category || !payAmount) return Alert.alert('Required', 'Fill in title, category, and pay rate.');
-    if (!user) return;
-    setSubmitting(true);
-    const { error } = await supabase.from('jobs').insert({
-      parent_id: user.id,
-      title,
-      category,
-      description,
-      pay_rate: parseFloat(payAmount),
-      pay_type: payType === 'hr' ? 'hourly' : 'flat',
-      location_area: location,
-      date: date + (startTime ? ` ${startTime}` : ''),
-      estimated_hours: hours ? parseFloat(hours) : null,
-      is_recurring: recurring,
-      frequency: recurring ? frequency : null,
-      kids_count: category === 'Babysitting' && numKids ? parseInt(numKids, 10) : null,
-      teens_needed: teensNeeded,
-      status: 'open',
-    });
-    setSubmitting(false);
-    if (error) {
-      Alert.alert('Error', error.message);
+    if (!title.trim() || !category || !payAmount) {
+      Alert.alert('Required fields', 'Fill in title, category, and pay rate.');
       return;
     }
-    Alert.alert('Job Posted! 🎉', `"${title}" is now live and teens can apply.`, [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+    if (!user) return;
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase.from('jobs').insert({
+        parent_id: user.id,
+        title: title.trim(),
+        category,
+        description: description.trim(),
+        pay_rate: parseFloat(payAmount),
+        pay_type: payType === 'hr' ? 'hourly' : 'flat',
+        location_area: location.trim() || null,
+        date: date + (startTime ? ` ${startTime}` : '') || null,
+        estimated_hours: hours ? parseFloat(hours) : null,
+        is_recurring: recurring,
+        frequency: recurring ? frequency : null,
+        kids_count: category === 'Babysitting' && numKids ? parseInt(numKids, 10) : null,
+        teens_needed: teensNeeded,
+        status: 'open',
+        created_at: new Date().toISOString(),
+      }).select().single();
+      if (error) throw error;
+      Alert.alert('Posted!', 'Your job is now live.');
+      router.back();
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
-    <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
-      <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-        <Text style={s.backText}>← Back</Text>
-      </TouchableOpacity>
-      <Text style={s.pageTitle}>Post a Job</Text>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: ds.c.bg }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 60 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
 
-      {/* Title */}
-      <Text style={s.label}>Job Title</Text>
-      <TextInput style={s.input} placeholder="e.g. Lawn Mowing" value={title} onChangeText={setTitle} />
-
-      {/* Category */}
-      <Text style={s.label}>Category</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.chipScroll} contentContainerStyle={{ gap: 8, paddingRight: 16 }}>
-        {CATEGORIES.map(c => (
-          <TouchableOpacity key={c} style={[s.chip, category === c && { backgroundColor: CAT_COLORS[c], borderColor: CAT_COLORS[c] }]} onPress={() => setCategory(c)}>
-            <Text style={[s.chipText, category === c && s.chipTextOn]}>{c}</Text>
+        {/* Header nav */}
+        <View style={{ paddingTop: 56, paddingHorizontal: 24, marginBottom: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: ds.c.secondary }}>← Back</Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Description */}
-      <View style={s.labelRow}>
-        <Text style={s.label}>Description</Text>
-        <Text style={s.counter}>{description.length}/300</Text>
-      </View>
-      <TextInput style={s.textArea} placeholder="Describe the job, what to bring, any requirements..." value={description} onChangeText={t => setDescription(t.slice(0, 300))} multiline />
-
-      {/* Pay rate */}
-      <Text style={s.label}>Pay Rate</Text>
-      <View style={s.payRow}>
-        <Text style={s.payPrefix}>$</Text>
-        <TextInput style={s.payInput} placeholder="15" value={payAmount} onChangeText={setPayAmount} keyboardType="number-pad" />
-        <TouchableOpacity style={[s.payTypeBtn, payType === 'hr' && s.payTypeBtnOn]} onPress={() => setPayType('hr')}>
-          <Text style={[s.payTypeText, payType === 'hr' && s.payTypeTextOn]}>/hr</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[s.payTypeBtn, payType === 'flat' && s.payTypeBtnOn]} onPress={() => setPayType('flat')}>
-          <Text style={[s.payTypeText, payType === 'flat' && s.payTypeTextOn]}>Flat rate</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Date + time */}
-      <View style={s.row}>
-        <View style={s.halfField}>
-          <Text style={s.label}>Date</Text>
-          <TextInput style={s.input} placeholder="e.g. Apr 12" value={date} onChangeText={setDate} />
         </View>
-        <View style={s.halfField}>
-          <Text style={s.label}>Start Time</Text>
-          <TextInput style={s.input} placeholder="e.g. 3:00pm" value={startTime} onChangeText={setStartTime} />
+
+        {/* Headline */}
+        <View style={{ paddingHorizontal: 24, marginBottom: 36 }}>
+          <Text style={{ fontFamily: ds.f.serifBold, fontSize: 42, color: ds.c.primary, lineHeight: 48, letterSpacing: -0.5, marginBottom: 10 }}>
+            Post a Job.
+          </Text>
+          <Text style={{ fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurfaceVariant, lineHeight: 22 }}>
+            Describe it and teens in your area will apply.
+          </Text>
         </View>
-      </View>
 
-      <Text style={s.label}>Estimated Hours</Text>
-      <TextInput style={s.input} placeholder="e.g. 2" value={hours} onChangeText={setHours} keyboardType="number-pad" />
+        {/* Form card */}
+        <View style={{ marginHorizontal: 24, backgroundColor: ds.c.surfaceContainerLow, borderRadius: 32, padding: 28 }}>
 
-      {/* Location */}
-      <Text style={s.label}>Location (neighborhood only)</Text>
-      <TextInput style={s.input} placeholder="e.g. Oak Street area, Maplewood NJ" value={location} onChangeText={setLocation} />
+          {/* Job Title */}
+          <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 8 }}>Job Title</Text>
+          <View style={{ ...dsField, marginBottom: 24 }}>
+            <Ionicons name="create-outline" size={18} color={ds.c.onSurfaceVariant} />
+            <TextInput
+              style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurface }}
+              placeholder="e.g. Lawn Mowing"
+              placeholderTextColor={ds.c.outlineVariant}
+              value={title}
+              onChangeText={setTitle}
+            />
+          </View>
 
-      {/* Recurring toggle */}
-      <View style={s.toggleRow}>
-        <View>
-          <Text style={s.label}>Recurring job?</Text>
-          <Text style={s.toggleSub}>Repeat this on a schedule</Text>
-        </View>
-        <Switch value={recurring} onValueChange={setRecurring} trackColor={{ true: '#22c55e', false: '#e2e8f0' }} thumbColor="#fff" />
-      </View>
-      {recurring && (
-        <View style={s.freqRow}>
-          {FREQUENCIES.map(f => (
-            <TouchableOpacity key={f} style={[s.freqBtn, frequency === f && s.freqBtnOn]} onPress={() => setFrequency(f)}>
-              <Text style={[s.freqText, frequency === f && s.freqTextOn]}>{f}</Text>
+          {/* Category */}
+          <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 12 }}>Category</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
+            {CATEGORIES.map((c) => (
+              <TouchableOpacity
+                key={c}
+                style={{
+                  paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9999,
+                  backgroundColor: category === c ? ds.c.primary : ds.c.surfaceContainerHigh,
+                  borderWidth: category === c ? 0 : 1,
+                  borderColor: ds.c.outlineVariant,
+                }}
+                onPress={() => setCategory(c)}
+              >
+                <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: category === c ? ds.c.white : ds.c.onSurfaceVariant }}>
+                  {c}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Description */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+            <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant }}>Description</Text>
+            <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.outlineVariant }}>{description.length}/300</Text>
+          </View>
+          <View style={{ backgroundColor: ds.c.surfaceContainerHigh, borderRadius: 16, padding: 16, marginBottom: 24 }}>
+            <TextInput
+              style={{ fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurface, minHeight: 90, textAlignVertical: 'top' }}
+              placeholder="Describe the job, requirements, what to bring..."
+              placeholderTextColor={ds.c.outlineVariant}
+              value={description}
+              onChangeText={(t) => setDescription(t.slice(0, 300))}
+              multiline
+            />
+          </View>
+
+          {/* Pay Rate */}
+          <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 12 }}>Pay Rate</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 }}>
+            <Text style={{ fontFamily: ds.f.serifBold, fontSize: 24, color: ds.c.primary }}>$</Text>
+            <View style={{ ...dsField, width: 90 }}>
+              <TextInput
+                style={{ flex: 1, fontFamily: ds.f.serifBold, fontSize: 22, color: ds.c.primary, textAlign: 'center' }}
+                placeholder="15"
+                placeholderTextColor={ds.c.outlineVariant}
+                value={payAmount}
+                onChangeText={setPayAmount}
+                keyboardType="number-pad"
+              />
+            </View>
+            {(['hr', 'flat'] as const).map((pt) => (
+              <TouchableOpacity
+                key={pt}
+                style={{
+                  paddingHorizontal: 16, paddingVertical: 12, borderRadius: 9999,
+                  backgroundColor: payType === pt ? ds.c.primary : ds.c.surfaceContainerHigh,
+                  borderWidth: payType === pt ? 0 : 1,
+                  borderColor: ds.c.outlineVariant,
+                }}
+                onPress={() => setPayType(pt)}
+              >
+                <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: payType === pt ? ds.c.white : ds.c.onSurfaceVariant }}>
+                  {pt === 'hr' ? '/hr' : 'Flat'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Date + Time */}
+          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 8 }}>Date</Text>
+              <View style={{ ...dsField }}>
+                <Ionicons name="calendar-outline" size={16} color={ds.c.onSurfaceVariant} />
+                <TextInput
+                  style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurface }}
+                  placeholder="Apr 12"
+                  placeholderTextColor={ds.c.outlineVariant}
+                  value={date}
+                  onChangeText={setDate}
+                />
+              </View>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 8 }}>Start Time</Text>
+              <View style={{ ...dsField }}>
+                <Ionicons name="time-outline" size={16} color={ds.c.onSurfaceVariant} />
+                <TextInput
+                  style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurface }}
+                  placeholder="3:00pm"
+                  placeholderTextColor={ds.c.outlineVariant}
+                  value={startTime}
+                  onChangeText={setStartTime}
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Hours */}
+          <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 8 }}>Estimated Hours</Text>
+          <View style={{ ...dsField, marginBottom: 24 }}>
+            <Ionicons name="hourglass-outline" size={18} color={ds.c.onSurfaceVariant} />
+            <TextInput
+              style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurface }}
+              placeholder="e.g. 2"
+              placeholderTextColor={ds.c.outlineVariant}
+              value={hours}
+              onChangeText={setHours}
+              keyboardType="number-pad"
+            />
+          </View>
+
+          {/* Location */}
+          <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 8 }}>Location</Text>
+          <View style={{ ...dsField, marginBottom: 24 }}>
+            <Ionicons name="location-outline" size={18} color={ds.c.onSurfaceVariant} />
+            <TextInput
+              style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurface }}
+              placeholder="Neighborhood only (e.g. Oak Street area)"
+              placeholderTextColor={ds.c.outlineVariant}
+              value={location}
+              onChangeText={setLocation}
+            />
+          </View>
+
+          {/* Recurring toggle */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: recurring ? 16 : 24, backgroundColor: ds.c.surfaceContainerHigh, borderRadius: 16, padding: 16 }}>
+            <View>
+              <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: ds.c.onSurface }}>Recurring job</Text>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant, marginTop: 2 }}>Repeat on a schedule</Text>
+            </View>
+            <Switch
+              value={recurring}
+              onValueChange={setRecurring}
+              trackColor={{ true: ds.c.secondary, false: ds.c.outlineVariant }}
+              thumbColor={ds.c.white}
+            />
+          </View>
+          {recurring && (
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24 }}>
+              {FREQUENCIES.map((f) => (
+                <TouchableOpacity
+                  key={f}
+                  style={{
+                    flex: 1, paddingVertical: 10, borderRadius: 9999, alignItems: 'center',
+                    backgroundColor: frequency === f ? ds.c.primary : ds.c.surfaceContainerHigh,
+                    borderWidth: frequency === f ? 0 : 1,
+                    borderColor: ds.c.outlineVariant,
+                  }}
+                  onPress={() => setFrequency(f)}
+                >
+                  <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 12, color: frequency === f ? ds.c.white : ds.c.onSurfaceVariant }}>
+                    {f}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Babysitting: kids */}
+          {category === 'Babysitting' && (
+            <>
+              <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 8 }}>Number of Kids</Text>
+              <View style={{ ...dsField, marginBottom: 24 }}>
+                <Ionicons name="happy-outline" size={18} color={ds.c.onSurfaceVariant} />
+                <TextInput
+                  style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurface }}
+                  placeholder="e.g. 2"
+                  placeholderTextColor={ds.c.outlineVariant}
+                  value={numKids}
+                  onChangeText={setNumKids}
+                  keyboardType="number-pad"
+                />
+              </View>
+            </>
+          )}
+
+          {/* Teens needed stepper */}
+          <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 16 }}>Teens Needed</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, marginBottom: 32 }}>
+            <TouchableOpacity
+              style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: ds.c.surfaceContainerHigh, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: ds.c.outlineVariant }}
+              onPress={() => setTeensNeeded(Math.max(1, teensNeeded - 1))}
+            >
+              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 20, color: ds.c.onSurface }}>−</Text>
             </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
-      {/* Kids (babysitting only) */}
-      {category === 'Babysitting' && (
-        <>
-          <Text style={s.label}>Number of kids</Text>
-          <TextInput style={s.input} placeholder="e.g. 2" value={numKids} onChangeText={setNumKids} keyboardType="number-pad" />
-        </>
-      )}
-
-      {/* Teens needed stepper */}
-      <Text style={s.label}>How many teens do you need?</Text>
-      <View style={s.stepperRow}>
-        <TouchableOpacity style={s.stepBtn} onPress={() => setTeensNeeded(Math.max(1, teensNeeded - 1))}>
-          <Text style={s.stepBtnText}>−</Text>
-        </TouchableOpacity>
-        <Text style={s.stepVal}>{teensNeeded === 3 ? '3+' : teensNeeded}</Text>
-        <TouchableOpacity style={s.stepBtn} onPress={() => setTeensNeeded(Math.min(3, teensNeeded + 1))}>
-          <Text style={s.stepBtnText}>+</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Preview card */}
-      <Text style={s.label}>Preview</Text>
-      <View style={s.previewCard}>
-        <View style={s.previewHeader}>
-          <View style={s.previewParentRow}>
-            <View style={s.previewCircle}><Text style={s.previewInitials}>{initials}</Text></View>
-            <Text style={s.previewParent}>{displayName || 'You'}</Text>
-            <Text>✅</Text>
+            <Text style={{ fontFamily: ds.f.serifBold, fontSize: 32, color: ds.c.primary, minWidth: 40, textAlign: 'center' }}>
+              {teensNeeded === 3 ? '3+' : teensNeeded}
+            </Text>
+            <TouchableOpacity
+              style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: ds.c.surfaceContainerHigh, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: ds.c.outlineVariant }}
+              onPress={() => setTeensNeeded(Math.min(3, teensNeeded + 1))}
+            >
+              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 20, color: ds.c.onSurface }}>+</Text>
+            </TouchableOpacity>
           </View>
-          <Text>🔖</Text>
-        </View>
-        <Text style={s.previewTitle}>{title || 'Job Title'}</Text>
-        {category ? (
-          <View style={[s.previewPill, { backgroundColor: catColor + '20' }]}>
-            <Text style={[s.previewPillText, { color: catColor }]}>{category}</Text>
-          </View>
-        ) : <View style={s.previewPillEmpty}><Text style={s.previewPillEmptyText}>Category</Text></View>}
-        <View style={s.previewMeta}>
-          <Text style={s.previewPay}>{payLabel}</Text>
-          {location ? <Text style={s.previewMetaText}>📍 {location}</Text> : null}
-          {date ? <Text style={s.previewMetaText}>📅 {date}</Text> : null}
-        </View>
-        {recurring && <Text style={s.previewRecurring}>🔁 {frequency}</Text>}
-        <View style={s.previewApplyBtn}><Text style={s.previewApplyText}>Apply Now</Text></View>
-      </View>
 
-      <TouchableOpacity style={[s.submitBtn, submitting && { opacity: 0.7 }]} onPress={submit} disabled={submitting}>
-        {submitting ? <ActivityIndicator color="#fff" /> : <Text style={s.submitText}>Post Job</Text>}
-      </TouchableOpacity>
-    </ScrollView>
+          <GradientButton label="Post Job" onPress={submit} loading={submitting} fullWidth />
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
-
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', paddingTop: 56, paddingHorizontal: 20 },
-  backBtn: { marginBottom: 12 },
-  backText: { color: '#22c55e', fontSize: 16, fontWeight: '600' },
-  pageTitle: { fontSize: 28, fontWeight: '800', color: '#0f172a', marginBottom: 4 },
-  labelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 18, marginBottom: 8 },
-  label: { fontSize: 14, fontWeight: '700', color: '#0f172a', marginTop: 18, marginBottom: 8 },
-  counter: { fontSize: 12, color: '#94a3b8' },
-  input: { borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 12, padding: 14, fontSize: 15, backgroundColor: '#f8fafc', color: '#0f172a' },
-  textArea: { borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 12, padding: 14, fontSize: 15, backgroundColor: '#f8fafc', color: '#0f172a', height: 110, textAlignVertical: 'top' },
-
-  chipScroll: { marginBottom: 4 },
-  chip: { borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 9, backgroundColor: '#f8fafc' },
-  chipText: { fontSize: 13, fontWeight: '600', color: '#64748b' },
-  chipTextOn: { color: '#fff' },
-
-  payRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  payPrefix: { fontSize: 20, fontWeight: '700', color: '#0f172a' },
-  payInput: { borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 10, padding: 12, fontSize: 20, fontWeight: '700', width: 80, textAlign: 'center', color: '#22c55e', backgroundColor: '#f8fafc' },
-  payTypeBtn: { borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 10 },
-  payTypeBtnOn: { backgroundColor: '#22c55e', borderColor: '#22c55e' },
-  payTypeText: { fontSize: 13, fontWeight: '600', color: '#64748b' },
-  payTypeTextOn: { color: '#fff' },
-
-  row: { flexDirection: 'row', gap: 12 },
-  halfField: { flex: 1 },
-
-  toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 18, backgroundColor: '#f8fafc', borderRadius: 12, padding: 14 },
-  toggleSub: { fontSize: 12, color: '#94a3b8', marginTop: 2 },
-  freqRow: { flexDirection: 'row', gap: 10, marginTop: 10 },
-  freqBtn: { flex: 1, borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 10, padding: 10, alignItems: 'center' },
-  freqBtnOn: { backgroundColor: '#22c55e', borderColor: '#22c55e' },
-  freqText: { fontSize: 13, fontWeight: '600', color: '#64748b' },
-  freqTextOn: { color: '#fff' },
-
-  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 20 },
-  stepBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#f0fdf4', borderWidth: 1.5, borderColor: '#22c55e', justifyContent: 'center', alignItems: 'center' },
-  stepBtnText: { fontSize: 22, fontWeight: '700', color: '#22c55e' },
-  stepVal: { fontSize: 24, fontWeight: '800', color: '#0f172a', minWidth: 32, textAlign: 'center' },
-
-  previewCard: { borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 16, padding: 16, marginTop: 8, backgroundColor: '#fafafa' },
-  previewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  previewParentRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  previewCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#dcfce7', justifyContent: 'center', alignItems: 'center' },
-  previewInitials: { fontSize: 12, fontWeight: '800', color: '#16a34a' },
-  previewParent: { fontSize: 13, fontWeight: '600', color: '#0f172a' },
-  previewTitle: { fontSize: 18, fontWeight: '800', color: '#0f172a', marginBottom: 8 },
-  previewPill: { alignSelf: 'flex-start', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4, marginBottom: 10 },
-  previewPillText: { fontSize: 12, fontWeight: '700' },
-  previewPillEmpty: { alignSelf: 'flex-start', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 4, marginBottom: 10, backgroundColor: '#f1f5f9' },
-  previewPillEmptyText: { fontSize: 12, color: '#94a3b8' },
-  previewMeta: { flexDirection: 'row', gap: 12, marginBottom: 8, flexWrap: 'wrap' },
-  previewPay: { fontSize: 14, fontWeight: '800', color: '#22c55e' },
-  previewMetaText: { fontSize: 13, color: '#64748b' },
-  previewRecurring: { fontSize: 12, color: '#7c3aed', fontWeight: '600', marginBottom: 10 },
-  previewApplyBtn: { backgroundColor: '#22c55e', borderRadius: 10, padding: 12, alignItems: 'center', marginTop: 4 },
-  previewApplyText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-
-  submitBtn: { backgroundColor: '#22c55e', borderRadius: 14, padding: 18, alignItems: 'center', marginTop: 28 },
-  submitText: { color: '#fff', fontSize: 17, fontWeight: '800' },
-});

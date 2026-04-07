@@ -1,5 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import Text from '@/components/Text';
 
 const INVITES = [
   { id: 'i1', title: 'Dog Walking', parent: 'Mike R.' },

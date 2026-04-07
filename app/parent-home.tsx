@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, FlatList, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import Text from '@/components/Text';
 
 const TEENS = [
   { id: '1', name: 'Jordan M.', age: 16, skills: ['Yard Work', 'Errands', 'Cleaning'], rating: 4.8, initials: 'JM' },

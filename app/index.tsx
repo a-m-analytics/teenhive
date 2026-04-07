@@ -1,67 +1,93 @@
-import { useAuth } from '@/context/AuthContext';
-import { Redirect, useRouter } from 'expo-router';
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Logo from '@/components/Logo';
+import { ds, dsLabel } from '@/lib/design';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { useEffect } from 'react';
+import { Dimensions, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 
-export default function WelcomeScreen() {
-  const { user, profile, loading } = useAuth();
+const { height } = Dimensions.get('window');
+
+export default function Welcome() {
   const router = useRouter();
 
-  if (loading) {
-    return (
-      <View style={s.loadingScreen}>
-        <ActivityIndicator size="large" color="#22c55e" />
-      </View>
-    );
-  }
-
-  if (user && profile) {
-    return <Redirect href="/(tabs)" />;
-  }
+  useEffect(() => {
+    AsyncStorage.getItem('onboarded').then((val) => {
+      if (!val) router.replace('/onboarding' as any);
+    });
+  }, []);
 
   return (
-    <View style={s.container}>
-      <View style={s.hero}>
-        <View style={s.logoCircle}><Text style={s.logoEmoji}>🏘️</Text></View>
-        <Text style={s.appName}>Neighborly Jobs</Text>
-        <Text style={s.tagline}>Find local jobs.{'\n'}Build your reputation.</Text>
-      </View>
-      <View style={s.buttons}>
-        <TouchableOpacity style={s.btnTeen} onPress={() => router.push('/signup?role=teen')}>
-          <Text style={s.btnEmoji}>👦</Text>
-          <Text style={s.btnTitle}>I'm a Teen</Text>
-          <Text style={s.btnSub}>Find jobs in your neighborhood</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.btnParent} onPress={() => router.push('/signup?role=parent')}>
-          <Text style={s.btnEmoji}>👨‍👩‍👦</Text>
-          <Text style={s.btnTitle}>I'm a Parent</Text>
-          <Text style={s.btnSub}>Post jobs for local teens</Text>
-        </TouchableOpacity>
-        <View style={s.loginRow}>
-          <Text style={s.loginPrompt}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => router.push('/login')}>
-            <Text style={s.loginLink}>Log In</Text>
+    <View style={{ flex: 1, backgroundColor: ds.c.primary }}>
+      <StatusBar barStyle="light-content" />
+      <LinearGradient colors={ds.gradient} style={{ flex: 1 }}>
+
+        {/* Hero — centered logo + headline */}
+        <View style={{ position: 'absolute', top: height * 0.14, left: 28, right: 28, alignItems: 'flex-start' }}>
+          <Logo variant="light" size="lg" />
+          <View style={{ height: 28 }} />
+          <Text style={{
+            fontFamily: ds.f.serifBold, fontSize: 44, color: ds.c.white,
+            lineHeight: 50, letterSpacing: -0.5, marginBottom: 14,
+          }}>
+            Good work{'\n'}starts here.
+          </Text>
+          <Text style={{
+            fontFamily: ds.f.sans, fontSize: 16, color: 'rgba(243,251,244,0.65)',
+            lineHeight: 24,
+          }}>
+            Jobs done by people you can trust, right in your neighborhood.
+          </Text>
+        </View>
+
+        {/* Bottom panel */}
+        <View style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          backgroundColor: ds.c.bg,
+          borderTopLeftRadius: 36, borderTopRightRadius: 36,
+          paddingHorizontal: 24, paddingTop: 28, paddingBottom: 52,
+        }}>
+          <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ds.c.onSurfaceVariant, marginBottom: 14, textAlign: 'center', letterSpacing: 0.3 }}>
+            Create an account as a...
+          </Text>
+
+          {/* Role cards */}
+          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+            <TouchableOpacity
+              style={{
+                flex: 1, borderRadius: 20, padding: 20,
+                backgroundColor: ds.c.primaryContainer,
+              }}
+              onPress={() => router.push({ pathname: '/signup', params: { role: 'teen' } } as any)}
+              activeOpacity={0.75}
+            >
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: 'rgba(243,251,244,0.5)', marginBottom: 6, letterSpacing: 0.5 }}>I AM A</Text>
+              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 26, color: ds.c.white, lineHeight: 30, marginBottom: 8 }}>Teen</Text>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: 'rgba(243,251,244,0.6)', lineHeight: 18 }}>I want to find jobs and earn money</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{
+                flex: 1, borderRadius: 20, padding: 20,
+                backgroundColor: ds.c.secondaryContainer,
+              }}
+              onPress={() => router.push({ pathname: '/signup', params: { role: 'parent' } } as any)}
+              activeOpacity={0.75}
+            >
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: 'rgba(5,27,14,0.4)', marginBottom: 6, letterSpacing: 0.5 }}>I AM A</Text>
+              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 26, color: ds.c.primary, lineHeight: 30, marginBottom: 8 }}>Parent</Text>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: 'rgba(5,27,14,0.55)', lineHeight: 18 }}>I want to hire trusted teens nearby</Text>
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity onPress={() => router.push('/login' as any)} style={{ alignItems: 'center', paddingVertical: 14 }}>
+            <Text style={{ fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurfaceVariant }}>
+              Already have an account?{' '}
+              <Text style={{ fontFamily: ds.f.sansSemiBold, color: ds.c.secondary }}>Sign In</Text>
+            </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </LinearGradient>
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  loadingScreen: { flex: 1, backgroundColor: '#f0fdf4', justifyContent: 'center', alignItems: 'center' },
-  container: { flex: 1, backgroundColor: '#f0fdf4', justifyContent: 'space-between', padding: 28, paddingTop: 90 },
-  hero: { alignItems: 'center', gap: 12 },
-  logoCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#22c55e', justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
-  logoEmoji: { fontSize: 36 },
-  appName: { fontSize: 36, fontWeight: '800', color: '#0f172a' },
-  tagline: { fontSize: 17, color: '#64748b', textAlign: 'center', lineHeight: 26 },
-  buttons: { gap: 14, paddingBottom: 40 },
-  btnTeen: { backgroundColor: '#22c55e', padding: 20, borderRadius: 16, alignItems: 'center', gap: 4 },
-  btnParent: { backgroundColor: '#0f172a', padding: 20, borderRadius: 16, alignItems: 'center', gap: 4 },
-  btnEmoji: { fontSize: 28 },
-  btnTitle: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  btnSub: { color: 'rgba(255,255,255,0.7)', fontSize: 13 },
-  loginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingTop: 4 },
-  loginPrompt: { color: '#64748b', fontSize: 14 },
-  loginLink: { color: '#22c55e', fontSize: 14, fontWeight: '700' },
-});

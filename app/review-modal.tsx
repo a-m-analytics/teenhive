@@ -1,80 +1,92 @@
-import { addReview } from '@/lib/store';
-import { currentUser } from '@/lib/user';
+import GradientButton from '@/components/GradientButton';
+import { useAuth } from '@/context/AuthContext';
+import { ds, dsLabel } from '@/lib/design';
+import { submitReview } from '@/lib/reviews';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
+const STAR_LABELS = ['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent!'];
 
 export default function ReviewModal() {
-  const { targetId, jobTitle } = useLocalSearchParams<{ targetId: string; jobTitle: string }>();
+  const { jobId, revieweeId, jobTitle } = useLocalSearchParams<{
+    jobId: string; revieweeId: string; jobTitle: string;
+  }>();
   const router = useRouter();
+  const { user } = useAuth();
   const [stars, setStars] = useState(0);
-  const [text, setText] = useState('');
+  const [comment, setComment] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const submit = () => {
-    if (stars === 0) return Alert.alert('Select a star rating first');
-    addReview({ targetId: targetId ?? '', author: currentUser.name || 'Anonymous', stars, text });
-    Alert.alert('Review Submitted! ⭐', 'Thank you for your feedback.', [
+  const submit = async () => {
+    if (!stars || !user || !jobId || !revieweeId) {
+      Alert.alert('Please select a star rating first.');
+      return;
+    }
+    setSubmitting(true);
+    const { error } = await submitReview(user.id, revieweeId, jobId, stars, comment);
+    setSubmitting(false);
+    if (error) { Alert.alert('Error', error); return; }
+    Alert.alert('Review submitted', 'Thank you for your feedback!', [
       { text: 'OK', onPress: () => router.back() },
     ]);
   };
 
   return (
-    <View style={s.overlay}>
-      <View style={s.sheet}>
-        <Text style={s.title}>Leave a Review</Text>
-        {jobTitle ? <Text style={s.sub}>for "{jobTitle}"</Text> : null}
+    <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}>
+      <View style={{ backgroundColor: ds.c.bg, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 28, paddingBottom: 52 }}>
 
-        {/* Stars */}
-        <Text style={s.label}>Your Rating</Text>
-        <View style={s.starsRow}>
-          {[1, 2, 3, 4, 5].map(n => (
-            <TouchableOpacity key={n} onPress={() => setStars(n)} style={s.starBtn}>
-              <Text style={[s.star, n <= stars && s.starOn]}>★</Text>
+        <Text style={{ fontFamily: ds.f.serifBold, fontSize: 30, color: ds.c.primary, letterSpacing: -0.3, marginBottom: 4 }}>
+          Leave a Review
+        </Text>
+        {jobTitle ? (
+          <Text style={{ fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurfaceVariant, marginBottom: 28 }}>
+            for "{jobTitle}"
+          </Text>
+        ) : <View style={{ height: 20 }} />}
+
+        <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 16 }}>Your Rating</Text>
+
+        {/* Star selector */}
+        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
+          {[1, 2, 3, 4, 5].map((n) => (
+            <TouchableOpacity key={n} onPress={() => setStars(n)} style={{ padding: 4 }}>
+              <Text style={{ fontSize: 42, color: n <= stars ? '#f59e0b' : ds.c.outlineVariant }}>★</Text>
             </TouchableOpacity>
           ))}
         </View>
-        <Text style={s.starLabel}>
-          {stars === 0 ? 'Tap to rate' : ['', 'Poor', 'Fair', 'Good', 'Great', 'Excellent!'][stars]}
+        {stars > 0 && (
+          <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: ds.c.secondary, marginBottom: 24 }}>
+            {STAR_LABELS[stars]}
+          </Text>
+        )}
+        {stars === 0 && <View style={{ height: 24 }} />}
+
+        <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 8 }}>
+          Write a Review{' '}
+          <Text style={{ fontFamily: ds.f.sans, fontSize: 11, color: ds.c.outlineVariant, letterSpacing: 0 }}>(optional)</Text>
+        </Text>
+        <View style={{ backgroundColor: ds.c.surfaceContainerLow, borderRadius: 16, padding: 16, marginBottom: 6 }}>
+          <TextInput
+            style={{ fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurface, minHeight: 90, textAlignVertical: 'top' }}
+            placeholder="Describe your experience..."
+            placeholderTextColor={ds.c.outlineVariant}
+            value={comment}
+            onChangeText={setComment}
+            multiline
+            maxLength={500}
+          />
+        </View>
+        <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.outlineVariant, textAlign: 'right', marginBottom: 24 }}>
+          {comment.length}/500
         </Text>
 
-        {/* Written review */}
-        <Text style={s.label}>Write a Review <Text style={s.optional}>(optional)</Text></Text>
-        <TextInput
-          style={s.input}
-          placeholder="Describe your experience..."
-          value={text}
-          onChangeText={setText}
-          multiline
-          placeholderTextColor="#94a3b8"
-        />
+        <GradientButton label="Submit Review" onPress={submit} loading={submitting} fullWidth />
 
-        <TouchableOpacity style={[s.submitBtn, stars === 0 && s.submitBtnDisabled]} onPress={submit} disabled={stars === 0}>
-          <Text style={s.submitText}>Submit Review</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.cancelBtn} onPress={() => router.back()}>
-          <Text style={s.cancelText}>Cancel</Text>
+        <TouchableOpacity style={{ paddingVertical: 16, alignItems: 'center' }} onPress={() => router.back()}>
+          <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 14, color: ds.c.onSurfaceVariant }}>Cancel</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 28, paddingBottom: 48 },
-  title: { fontSize: 22, fontWeight: '800', color: '#0f172a', marginBottom: 4 },
-  sub: { fontSize: 14, color: '#64748b', marginBottom: 20 },
-  label: { fontSize: 14, fontWeight: '700', color: '#0f172a', marginBottom: 10, marginTop: 16 },
-  optional: { fontWeight: '400', color: '#94a3b8' },
-  starsRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  starBtn: { padding: 4 },
-  star: { fontSize: 42, color: '#e2e8f0' },
-  starOn: { color: '#f59e0b' },
-  starLabel: { fontSize: 14, color: '#64748b', fontWeight: '600', marginBottom: 4 },
-  input: { borderWidth: 1.5, borderColor: '#e2e8f0', borderRadius: 12, padding: 14, fontSize: 14, minHeight: 100, textAlignVertical: 'top', color: '#0f172a', backgroundColor: '#f8fafc' },
-  submitBtn: { backgroundColor: '#22c55e', borderRadius: 14, padding: 16, alignItems: 'center', marginTop: 20 },
-  submitBtnDisabled: { opacity: 0.4 },
-  submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  cancelBtn: { padding: 14, alignItems: 'center' },
-  cancelText: { color: '#94a3b8', fontSize: 15, fontWeight: '600' },
-});

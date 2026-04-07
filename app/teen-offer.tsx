@@ -1,7 +1,8 @@
 import { currentUser } from '@/lib/user';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import Text from '@/components/Text';
 
 const SKILLS = ['Babysitting', 'Tutoring', 'Yard Work', 'Pet Care', 'Tech Help', 'Cleaning', 'Errands', 'Car Washing'];
 const AVAILABILITY = ['Weekdays after school', 'Weekends', 'Summers', 'Flexible'];
