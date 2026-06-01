@@ -41,3 +41,6 @@ app-example
 # generated native folders
 /ios
 /android
+
+# separate project — has its own repo
+mun-practice/
