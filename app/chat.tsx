@@ -1,4 +1,6 @@
+import OfflineBanner from '@/components/OfflineBanner';
 import { useAuth } from '@/context/AuthContext';
+import { trackMessageSent } from '@/lib/analytics';
 import { ds } from '@/lib/design';
 import { type Message } from '@/lib/messageService';
 import { blockUser, reportUser, type ReportReason } from '@/lib/safetyService';
@@ -8,6 +10,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActionSheetIOS,
+  ActivityIndicator,
   Alert,
   FlatList,
   KeyboardAvoidingView,
@@ -82,7 +85,7 @@ export default function Chat() {
           (msg.sender_id === user.id && msg.receiver_id === otherUserId) ||
           (msg.sender_id === otherUserId && msg.receiver_id === user.id)
         ) {
-          setMessages((prev) => [...prev, msg]);
+          setMessages((prev) => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
           // Mark as read if incoming
           if (msg.sender_id === otherUserId) {
             supabase.from('messages').update({ read: true }).eq('id', msg.id);
@@ -104,13 +107,17 @@ export default function Chat() {
     if (!input.trim() || !user || !otherUserId) return;
     const content = input.trim();
     setInput('');
-    await supabase.from('messages').insert({
+    const { data } = await supabase.from('messages').insert({
       sender_id: user.id,
       receiver_id: otherUserId,
       content,
       read: false,
-    });
-    // The realtime subscription will pick it up; no need to manually append
+    }).select().single();
+    // Optimistically append — realtime may not fire for the sender
+    if (data) {
+      setMessages(prev => prev.some(m => m.id === (data as Message).id) ? prev : [...prev, data as Message]);
+    }
+    trackMessageSent(user.id, otherUserId);
   };
 
   const openMoreMenu = () => {
@@ -164,6 +171,7 @@ export default function Chat() {
       style={{ flex: 1, backgroundColor: ds.c.bg }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <OfflineBanner />
       {/* Header */}
       <View style={{
         flexDirection: 'row', alignItems: 'center',
@@ -201,7 +209,7 @@ export default function Chat() {
         }}>
           <Ionicons name="shield-checkmark-outline" size={14} color={ds.c.secondary} style={{ marginRight: 8 }} />
           <Text style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant, lineHeight: 17 }}>
-            Keep it professional until you're both comfortable meeting in person.
+            Keep all communication here until you're both comfortable.
           </Text>
           <TouchableOpacity onPress={() => setBannerDismissed(true)} style={{ marginLeft: 10 }}>
             <Ionicons name="close" size={16} color={ds.c.onSurfaceVariant} />
@@ -211,10 +219,9 @@ export default function Chat() {
 
       {/* Messages */}
       {loading ? (
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: ds.c.surfaceContainerLow, justifyContent: 'center', alignItems: 'center' }}>
-            <Ionicons name="chatbubbles-outline" size={18} color={ds.c.onSurfaceVariant} />
-          </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12 }}>
+          <ActivityIndicator size="large" color={ds.c.secondary} />
+          <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant }}>Loading messages...</Text>
         </View>
       ) : (
         <FlatList

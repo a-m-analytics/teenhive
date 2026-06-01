@@ -3,8 +3,11 @@ import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { ds } from '@/lib/design';
+import { trackLogIn } from '@/lib/analytics';
 
 export default function Login() {
   const router = useRouter();
@@ -13,6 +16,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async () => {
     setError('');
@@ -23,7 +27,22 @@ export default function Login() {
     setLoading(true);
     const { error: authError } = await signIn(email.trim(), password);
     setLoading(false);
-    if (authError) { setError(authError); return; }
+    if (authError) {
+      if (authError.toLowerCase().includes('email not confirmed') || authError.toLowerCase().includes('not confirmed')) {
+        Alert.alert(
+          'Email not verified',
+          'Please check your email and click the verification link.',
+          [
+            { text: 'Resend email', onPress: () => router.push({ pathname: '/verify-email', params: { email: email.trim() } } as any) },
+            { text: 'OK', style: 'cancel' },
+          ]
+        );
+        return;
+      }
+      setError(authError);
+      return;
+    }
+    trackLogIn(email.trim());
     router.replace('/(tabs)' as any);
   };
 
@@ -80,19 +99,24 @@ export default function Login() {
               <Text style={s.forgot}>Forgot?</Text>
             </TouchableOpacity>
           </View>
-          <TextInput
-            style={s.input}
-            value={password}
-            onChangeText={(t) => { setPassword(t); setError(''); }}
-            placeholder="••••••••"
-            placeholderTextColor="#9ca3af"
-            secureTextEntry={true}
-            autoComplete="off"
-            textContentType="none"
-            importantForAutofill="no"
-            returnKeyType="done"
-            onSubmitEditing={handleLogin}
-          />
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#eef6ef', borderRadius: 12 }}>
+            <TextInput
+              style={[s.input, { flex: 1, backgroundColor: 'transparent' }]}
+              value={password}
+              onChangeText={(t) => { setPassword(t); setError(''); }}
+              placeholder="••••••••"
+              placeholderTextColor="#9ca3af"
+              secureTextEntry={!showPassword}
+              autoComplete="off"
+              textContentType="none"
+              importantForAutofill="no"
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
+            />
+            <TouchableOpacity style={{ paddingHorizontal: 14, paddingVertical: 16 }} onPress={() => setShowPassword(!showPassword)}>
+              <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#737972" />
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity
             style={[s.button, loading && { opacity: 0.6 }]}
@@ -102,18 +126,6 @@ export default function Login() {
             <Text style={s.buttonText}>{loading ? 'Signing in...' : 'SIGN IN'}</Text>
           </TouchableOpacity>
 
-          <View style={s.dividerRow}>
-            <View style={s.divider} />
-            <Text style={s.dividerText}>or</Text>
-            <View style={s.divider} />
-          </View>
-
-          <TouchableOpacity
-            style={s.outlineButton}
-            onPress={() => Alert.alert('Coming soon', 'Google sign-in is coming soon.')}
-          >
-            <Text style={s.outlineButtonText}>Continue with Google</Text>
-          </TouchableOpacity>
         </View>
 
         <TouchableOpacity style={s.createRow} onPress={() => router.push('/signup' as any)}>
@@ -133,35 +145,36 @@ const s = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 24, paddingTop: 60, paddingBottom: 16,
   },
-  back: { color: '#735c00', fontSize: 14, fontWeight: '600', width: 48 },
-  logo: { fontSize: 18, fontWeight: '700', fontStyle: 'italic', color: '#051b0e' },
+  back: { fontFamily: ds.f.sansSemiBold, color: '#735c00', fontSize: 14, width: 48 },
+  logo: { fontFamily: ds.f.serifBold, fontSize: 20, color: '#051b0e' },
   hero: { paddingHorizontal: 24, marginBottom: 32, marginTop: 8 },
-  title: { fontSize: 40, fontWeight: '700', fontStyle: 'italic', color: '#051b0e', lineHeight: 46, letterSpacing: -0.5, marginBottom: 10 },
-  subtitle: { fontSize: 15, color: '#737972' },
+  title: { fontFamily: ds.f.serifBold, fontSize: 42, color: '#051b0e', lineHeight: 48, letterSpacing: -0.5, marginBottom: 10 },
+  subtitle: { fontFamily: ds.f.sans, fontSize: 15, color: '#737972' },
   form: { paddingHorizontal: 24 },
-  label: { fontSize: 11, fontWeight: '700', color: '#434843', letterSpacing: 1.5, marginBottom: 8 },
+  label: { fontFamily: ds.f.sansBold, fontSize: 11, color: '#434843', letterSpacing: 1.5, marginBottom: 8 },
   input: {
+    fontFamily: ds.f.sans,
     backgroundColor: '#eef6ef', borderRadius: 12,
     paddingHorizontal: 16, paddingVertical: 16,
     fontSize: 16, color: '#161d19',
   },
-  forgot: { fontSize: 12, fontWeight: '600', color: '#735c00' },
+  forgot: { fontFamily: ds.f.sansSemiBold, fontSize: 12, color: '#735c00' },
   button: {
     backgroundColor: '#051b0e', borderRadius: 100,
     paddingVertical: 18, alignItems: 'center', marginTop: 28,
   },
-  buttonText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 1 },
+  buttonText: { fontFamily: ds.f.sansBold, color: '#fff', fontSize: 15, letterSpacing: 1 },
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 24 },
   divider: { flex: 1, height: 1, backgroundColor: '#e2eae3' },
-  dividerText: { fontSize: 13, color: '#737972', marginHorizontal: 14 },
+  dividerText: { fontFamily: ds.f.sans, fontSize: 13, color: '#737972', marginHorizontal: 14 },
   outlineButton: {
     borderWidth: 1.5, borderColor: '#c3c8c1', borderRadius: 100,
     paddingVertical: 16, alignItems: 'center',
   },
-  outlineButtonText: { fontSize: 14, fontWeight: '700', color: '#161d19' },
+  outlineButtonText: { fontFamily: ds.f.sansBold, fontSize: 14, color: '#161d19' },
   errorBox: { backgroundColor: '#fef2f2', borderRadius: 12, padding: 14, marginBottom: 20 },
-  errorText: { fontSize: 13, color: '#ef4444', fontWeight: '500' },
+  errorText: { fontFamily: ds.f.sansMedium, fontSize: 13, color: '#ef4444' },
   createRow: { alignItems: 'center', marginTop: 28 },
-  createText: { fontSize: 14, color: '#737972' },
-  createLink: { fontWeight: '700', color: '#735c00' },
+  createText: { fontFamily: ds.f.sans, fontSize: 14, color: '#737972' },
+  createLink: { fontFamily: ds.f.sansBold, color: '#735c00' },
 });

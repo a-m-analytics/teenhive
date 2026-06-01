@@ -1,4 +1,3 @@
-import { ds } from '@/lib/design';
 import { Ionicons } from '@expo/vector-icons';
 import { Text, TouchableOpacity, View } from 'react-native';
 
@@ -12,26 +11,25 @@ type Props = {
 
 export default function EmptyState({ icon, title, subtitle, buttonText, onButtonPress }: Props) {
   return (
-    <View style={{ alignItems: 'center', paddingHorizontal: 40, paddingVertical: 48 }}>
+    <View style={{ alignItems: 'center', paddingHorizontal: 40, paddingVertical: 60 }}>
       {icon && (
-        <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: ds.c.surfaceContainerLow, justifyContent: 'center', alignItems: 'center', marginBottom: 20 }}>
-          <Ionicons name={icon} size={28} color={ds.c.outlineVariant} />
-        </View>
+        <Ionicons name={icon} size={52} color="#e8f0e9" style={{ marginBottom: 20 }} />
       )}
-      <Text style={{ fontFamily: ds.f.sansBold, fontSize: 18, color: ds.c.onSurface, textAlign: 'center', marginBottom: 8 }}>
+      <Text style={{ fontFamily: 'Manrope_700Bold', fontSize: 20, color: '#051b0e', textAlign: 'center', marginBottom: 8 }}>
         {title}
       </Text>
       {subtitle ? (
-        <Text style={{ fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurfaceVariant, textAlign: 'center', lineHeight: 20, marginBottom: buttonText ? 24 : 0 }}>
+        <Text style={{ fontFamily: 'Manrope_400Regular', fontSize: 14, color: '#737972', textAlign: 'center', lineHeight: 22, marginBottom: buttonText ? 28 : 0 }}>
           {subtitle}
         </Text>
       ) : null}
       {buttonText && onButtonPress ? (
         <TouchableOpacity
-          style={{ backgroundColor: ds.c.primary, borderRadius: 9999, paddingVertical: 13, paddingHorizontal: 28 }}
+          activeOpacity={0.75}
+          style={{ backgroundColor: '#051b0e', borderRadius: 100, height: 52, paddingHorizontal: 32, justifyContent: 'center', alignItems: 'center' }}
           onPress={onButtonPress}
         >
-          <Text style={{ fontFamily: ds.f.sansBold, fontSize: 14, color: ds.c.white }}>{buttonText}</Text>
+          <Text style={{ fontFamily: 'Manrope_700Bold', fontSize: 14, color: '#ffffff' }}>{buttonText}</Text>
         </TouchableOpacity>
       ) : null}
     </View>

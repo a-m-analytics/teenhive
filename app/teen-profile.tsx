@@ -1,5 +1,6 @@
 import GradientButton from '@/components/GradientButton';
 import { useAuth } from '@/context/AuthContext';
+import { trackProfileViewed, trackInviteSent } from '@/lib/analytics';
 import { ds, dsLabel, dsSecondaryLabel } from '@/lib/design';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,13 +15,7 @@ import {
 type Teen = {
   id: string; full_name: string; age: number | null; bio: string | null;
   neighborhood: string | null; skills: string[]; availability: string[];
-  hourly_rate: number | null; rating: number; rating_count: number;
-  jobs_completed: number; trust_score: number;
-};
-
-type Review = {
-  id: string; rating: number; comment: string | null; created_at: string;
-  reviewer: { full_name: string } | null;
+  hourly_rate: number | null; jobs_completed: number; trust_score: number;
 };
 
 function getInitials(name: string): string {
@@ -42,7 +37,6 @@ export default function TeenProfile() {
   const { user, profile } = useAuth();
   const isParent = profile?.role === 'parent';
   const [teen, setTeen] = useState<Teen | null>(null);
-  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [inviteModal, setInviteModal] = useState(false);
   const [parentJobs, setParentJobs] = useState<{ id: string; title: string }[]>([]);
@@ -54,13 +48,10 @@ export default function TeenProfile() {
 
   useEffect(() => {
     if (!id) return;
-    Promise.all([
-      supabase.from('profiles').select('id, full_name, age, bio, neighborhood, skills, availability, hourly_rate, rating, rating_count, jobs_completed, trust_score').eq('id', id).single(),
-      supabase.from('reviews').select('id, rating, comment, created_at, reviewer:profiles!reviewer_id(full_name)').eq('reviewee_id', id).order('created_at', { ascending: false }),
-    ]).then(([teenRes, reviewsRes]) => {
+    supabase.from('profiles').select('id, full_name, age, bio, neighborhood, skills, availability, hourly_rate, jobs_completed, trust_score').eq('id', id).single().then((teenRes) => {
       if (teenRes.data) setTeen(teenRes.data as Teen);
-      if (reviewsRes.data) setReviews(reviewsRes.data as unknown as Review[]);
       setLoading(false);
+      if (user && id && user.id !== id) trackProfileViewed(user.id, id, 'teen');
     });
   }, [id]);
 
@@ -72,9 +63,29 @@ export default function TeenProfile() {
   }
 
   async function sendInvite() {
-    if (!selectedJobId || !id) return;
+    if (!selectedJobId || !id || !user) return;
     const job = parentJobs.find((j) => j.id === selectedJobId);
-    await supabase.from('invites').insert({ job_id: selectedJobId, teen_id: id, parent_id: user?.id });
+    // Check already invited/applied
+    const { data: existing } = await supabase
+      .from('applications')
+      .select('id')
+      .eq('job_id', selectedJobId)
+      .eq('teen_id', id)
+      .maybeSingle();
+    if (existing) {
+      Alert.alert('Already invited', 'This teen has already been invited or applied.');
+      return;
+    }
+    await supabase.from('applications').insert({ job_id: selectedJobId, teen_id: id, parent_id: user.id, status: 'invited', message: '' });
+    const parentName = profile?.full_name ?? 'A parent';
+    await supabase.from('notifications').insert({
+      user_id: id,
+      type: 'job_invitation',
+      title: 'You got an invite!',
+      body: `${parentName} invited you to: ${job?.title ?? 'a job'}`,
+      read: false,
+    });
+    if (user) trackInviteSent(user.id, id, selectedJobId);
     setInviteModal(false);
     Alert.alert('Invite Sent', `${teen?.full_name} has been invited to "${job?.title}".`);
   }
@@ -121,7 +132,7 @@ export default function TeenProfile() {
       <ScrollView contentContainerStyle={{ paddingBottom: isParent ? 110 : 60 }} showsVerticalScrollIndicator={false}>
 
         {/* Hero */}
-        <LinearGradient colors={ds.gradient} style={{ paddingTop: 56, paddingHorizontal: 24, paddingBottom: 40 }}>
+        <LinearGradient colors={ds.gradient} style={{ paddingTop: 56, paddingHorizontal: 24, paddingBottom: 48 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
             <TouchableOpacity onPress={() => router.back()}>
               <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: 'rgba(243,251,244,0.7)' }}>← Back</Text>
@@ -134,27 +145,26 @@ export default function TeenProfile() {
           </View>
 
           {/* Avatar + name */}
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 20 }}>
-            <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: ds.c.secondaryContainer, justifyContent: 'center', alignItems: 'center' }}>
-              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 28, color: ds.c.primary }}>{initials}</Text>
+          <View style={{ alignItems: 'center', paddingTop: 8 }}>
+            <View style={{ width: 90, height: 90, borderRadius: 45, backgroundColor: ds.c.secondaryContainer, justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 32, color: ds.c.primary }}>{initials}</Text>
             </View>
-            <View style={{ flex: 1, paddingBottom: 4 }}>
-              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 32, color: ds.c.white, lineHeight: 36, letterSpacing: -0.3, marginBottom: 6 }}>
-                {teen.full_name}
-              </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                {teen.age ? (
-                  <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 13, color: 'rgba(243,251,244,0.65)' }}>Age {teen.age}</Text>
-                ) : null}
-                {teen.neighborhood ? (
-                  <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 13, color: 'rgba(243,251,244,0.65)' }}>{teen.neighborhood}</Text>
-                ) : null}
+            <Text style={{ fontFamily: ds.f.serifBold, fontSize: 36, color: ds.c.white, lineHeight: 42, letterSpacing: -0.3, marginBottom: 8, textAlign: 'center' }}>
+              {teen.full_name}
+            </Text>
+            {teen.age ? (
+              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 20, color: 'rgba(243,251,244,0.85)', marginBottom: 4 }}>Age {teen.age}</Text>
+            ) : null}
+            {teen.neighborhood ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons name="location-outline" size={14} color="rgba(243,251,244,0.55)" />
+                <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 16, color: 'rgba(243,251,244,0.55)' }}>{teen.neighborhood}</Text>
               </View>
-            </View>
+            ) : null}
           </View>
 
           {/* Trust + rate badges */}
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 20 }}>
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 20, justifyContent: 'center' }}>
             <View style={{ backgroundColor: ds.c.secondaryContainer, borderRadius: 9999, paddingHorizontal: 14, paddingVertical: 6 }}>
               <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.primary }}>{trust.label}</Text>
             </View>
@@ -169,17 +179,11 @@ export default function TeenProfile() {
         <View style={{ paddingHorizontal: 24, paddingTop: 28 }}>
 
           {/* Stats row */}
-          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 24 }}>
-            {[
-              { label: 'Jobs Done', value: String(teen.jobs_completed) },
-              { label: 'Rating', value: teen.rating_count > 0 ? Number(teen.rating).toFixed(1) : '—' },
-              { label: 'Reviews', value: String(teen.rating_count) },
-            ].map((s, i) => (
-              <View key={s.label} style={{ flex: 1, backgroundColor: i === 0 ? ds.c.primaryContainer : ds.c.surfaceContainerLow, borderRadius: 20, padding: 16, alignItems: 'center' }}>
-                <Text style={{ fontFamily: ds.f.serifBold, fontSize: 22, color: i === 0 ? ds.c.secondaryContainer : ds.c.primary, letterSpacing: -0.3, marginBottom: 2 }}>{s.value}</Text>
-                <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 11, color: i === 0 ? 'rgba(243,251,244,0.6)' : ds.c.onSurfaceVariant, letterSpacing: 0.5 }}>{s.label}</Text>
-              </View>
-            ))}
+          <View style={{ marginBottom: 24 }}>
+            <View style={{ backgroundColor: ds.c.primaryContainer, borderRadius: 20, padding: 16, alignItems: 'center' }}>
+              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 22, color: ds.c.secondaryContainer, letterSpacing: -0.3, marginBottom: 2 }}>{String(teen.jobs_completed)}</Text>
+              <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 11, color: 'rgba(243,251,244,0.6)', letterSpacing: 0.5 }}>Jobs Done</Text>
+            </View>
           </View>
 
           {/* Bio */}
@@ -221,29 +225,6 @@ export default function TeenProfile() {
             </View>
           )}
 
-          {/* Hive Reputation (reviews) */}
-          <View style={{ backgroundColor: ds.c.primaryContainer, borderRadius: 24, padding: 22, marginBottom: 8 }}>
-            <Text style={{ ...dsLabel, color: ds.c.secondaryContainer, marginBottom: 14 }}>Hive Reputation</Text>
-            {reviews.length === 0 ? (
-              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-                <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 14, color: 'rgba(243,251,244,0.5)' }}>No reviews yet</Text>
-              </View>
-            ) : (
-              reviews.map((r, i) => (
-                <View key={r.id} style={{ borderTopWidth: i > 0 ? 1 : 0, borderTopColor: 'rgba(243,251,244,0.1)', paddingTop: i > 0 ? 16 : 0, marginTop: i > 0 ? 16 : 0 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                    <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: 'rgba(243,251,244,0.8)' }}>{r.reviewer?.full_name ?? 'Anonymous'}</Text>
-                    <View style={{ backgroundColor: ds.c.secondaryContainer, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 3 }}>
-                      <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.primary }}>{r.rating}/5</Text>
-                    </View>
-                  </View>
-                  {r.comment ? (
-                    <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: 'rgba(243,251,244,0.6)', lineHeight: 20 }}>{r.comment}</Text>
-                  ) : null}
-                </View>
-              ))
-            )}
-          </View>
         </View>
       </ScrollView>
 

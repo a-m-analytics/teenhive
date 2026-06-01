@@ -103,3 +103,47 @@ create policy if not exists "Anyone can read reviews" on reviews
   for select using (true);
 create policy if not exists "Authenticated users can insert reviews" on reviews
   for insert with check (auth.uid() = reviewer_id);
+
+-- 14. Fix applications status constraint (add 'invited' and 'completed')
+-- Drop old constraint and recreate with all valid statuses
+alter table applications drop constraint if exists applications_status_check;
+alter table applications add constraint applications_status_check
+  check (status in ('pending', 'accepted', 'declined', 'invited', 'completed'));
+
+-- 15. Add parent-specific profile fields
+alter table profiles add column if not exists num_kids integer;
+alter table profiles add column if not exists kids_ages text[] default '{}';
+alter table profiles add column if not exists has_pets boolean;
+alter table profiles add column if not exists pets_description text;
+alter table profiles add column if not exists home_type text;
+
+-- 16. Add job timing and recurrence fields
+alter table jobs add column if not exists start_time text;
+alter table jobs add column if not exists recurring_days text[] default '{}';
+
+-- 17. RLS: allow parents to insert invitations (status='invited') for their own jobs
+--     Drop any conflicting policy first, then recreate
+drop policy if exists "Parents can insert invitations" on applications;
+create policy "Parents can insert invitations"
+  on applications for insert
+  to authenticated
+  with check (
+    auth.uid() = parent_id AND
+    exists (select 1 from jobs where jobs.id = job_id and jobs.parent_id = auth.uid())
+  );
+
+-- 18. RLS: allow parents to read applications for their own jobs
+drop policy if exists "Parents can read own job applications" on applications;
+create policy "Parents can read own job applications"
+  on applications for select
+  to authenticated
+  using (
+    auth.uid() = parent_id OR auth.uid() = teen_id
+  );
+
+-- 19. RLS: allow parents to update applications for their own jobs (accept/decline)
+drop policy if exists "Parents can update own job applications" on applications;
+create policy "Parents can update own job applications"
+  on applications for update
+  to authenticated
+  using (auth.uid() = parent_id OR auth.uid() = teen_id);

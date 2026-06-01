@@ -1,12 +1,20 @@
 import { supabase } from './supabase';
+import { trackJobApplied, trackApplicationAccepted, trackInviteSent, trackJobCompleted } from './analytics';
 
-export const applyToJob = async (jobId: string, teenId: string, parentId: string, message: string) => {
+export const applyToJob = async (
+  jobId: string,
+  teenId: string,
+  parentId: string,
+  message: string,
+  teenName?: string,
+  jobTitle?: string,
+) => {
   const { data: existing } = await supabase
     .from('applications')
     .select('id')
     .eq('job_id', jobId)
     .eq('teen_id', teenId)
-    .single();
+    .maybeSingle();
 
   if (existing) throw new Error('You already applied to this job');
 
@@ -18,11 +26,15 @@ export const applyToJob = async (jobId: string, teenId: string, parentId: string
 
   if (error) throw error;
 
+  trackJobApplied(jobId, teenId, parentId);
+
   await supabase.from('notifications').insert({
     user_id: parentId,
     type: 'new_application',
     title: 'New Application',
-    body: 'A teen applied to your job',
+    body: teenName && jobTitle
+      ? `${teenName} applied to your job "${jobTitle}"`
+      : 'A teen applied to your job',
     data: { job_id: jobId, teen_id: teenId },
   });
 
@@ -34,18 +46,40 @@ export const acceptApplication = async (
   jobId: string,
   teenId: string,
   parentId: string,
+  teenName?: string,
+  jobTitle?: string,
 ) => {
-  await supabase.from('applications').update({ status: 'accepted' }).eq('id', applicationId);
+  // Accept this application
+  const { error: appError } = await supabase
+    .from('applications')
+    .update({ status: 'accepted' })
+    .eq('id', applicationId);
+  if (appError) throw new Error(`Failed to accept application: ${appError.message}`);
 
+  trackApplicationAccepted(applicationId, jobId, teenId);
+
+  // Decline all other pending/invited apps for the same job
   await supabase
-    .from('jobs')
-    .update({ status: 'in_progress', accepted_teen_id: teenId })
-    .eq('id', jobId);
+    .from('applications')
+    .update({ status: 'declined' })
+    .eq('job_id', jobId)
+    .neq('id', applicationId)
+    .in('status', ['pending', 'invited']);
 
+  // Mark job in progress
+  const { error: jobError } = await supabase
+    .from('jobs')
+    .update({ status: 'in_progress' })
+    .eq('id', jobId);
+  if (jobError) throw new Error(`Failed to update job status: ${jobError.message}`);
+
+  // Send opening message from parent to teen
+  const name = teenName ?? 'there';
+  const title = jobTitle ? ` for "${jobTitle}"` : '';
   await supabase.from('messages').insert({
     sender_id: parentId,
     receiver_id: teenId,
-    content: "Hi! I've accepted your application. Looking forward to working with you!",
+    content: `Hi ${name}! I've accepted your application${title}. Looking forward to working with you!`,
     job_id: jobId,
     read: false,
   });
@@ -54,27 +88,31 @@ export const acceptApplication = async (
     user_id: teenId,
     type: 'application_accepted',
     title: 'Application Accepted!',
-    body: 'A parent accepted your application. You can now chat!',
+    body: jobTitle
+      ? `Your application for "${jobTitle}" was accepted! Check your messages.`
+      : 'Your application was accepted! You can now chat with the parent.',
     data: { job_id: jobId, parent_id: parentId },
   });
 };
 
-export const declineApplication = async (applicationId: string, teenId: string) => {
+export const declineApplication = async (applicationId: string, teenId: string, jobTitle?: string) => {
   await supabase.from('applications').update({ status: 'declined' }).eq('id', applicationId);
 
   await supabase.from('notifications').insert({
     user_id: teenId,
     type: 'application_declined',
     title: 'Application Update',
-    body: 'A parent has declined your application',
+    body: jobTitle
+      ? `Update on your application for "${jobTitle}".`
+      : 'A parent has reviewed your application.',
     data: {},
   });
 };
 
 export const completeJob = async (jobId: string, applicationId: string, teenId: string) => {
   await supabase.from('jobs').update({ status: 'completed' }).eq('id', jobId);
-
   await supabase.from('applications').update({ status: 'completed' }).eq('id', applicationId);
+  trackJobCompleted(jobId, teenId, '');
 
   // Increment jobs_completed
   const { data: p } = await supabase.from('profiles').select('jobs_completed').eq('id', teenId).single();
@@ -92,40 +130,3 @@ export const completeJob = async (jobId: string, applicationId: string, teenId: 
   });
 };
 
-export const submitReview = async (
-  reviewerId: string,
-  revieweeId: string,
-  jobId: string,
-  rating: number,
-  comment: string,
-) => {
-  await supabase.from('reviews').insert({
-    reviewer_id: reviewerId,
-    reviewee_id: revieweeId,
-    job_id: jobId,
-    rating,
-    comment,
-  });
-
-  // Recalculate average rating
-  const { data: reviews } = await supabase
-    .from('reviews')
-    .select('rating')
-    .eq('reviewee_id', revieweeId);
-
-  if (reviews && reviews.length > 0) {
-    const avg = reviews.reduce((sum: number, r: any) => sum + r.rating, 0) / reviews.length;
-    await supabase
-      .from('profiles')
-      .update({ rating: Math.round(avg * 10) / 10, rating_count: reviews.length })
-      .eq('id', revieweeId);
-  }
-
-  await supabase.from('notifications').insert({
-    user_id: revieweeId,
-    type: 'new_review',
-    title: 'New Review!',
-    body: `You received a ${rating} star review`,
-    data: { job_id: jobId },
-  });
-};

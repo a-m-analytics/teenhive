@@ -1,26 +1,41 @@
 {
   "expo": {
     "name": "Teen Hive",
-    "slug": "teen-hive",
+    "slug": "teenhive",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "teenhive",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#051b0e"
+    },
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.teenhive.app",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSUserNotificationsUsageDescription": "Teen Hive sends you notifications for new job matches, messages, and application updates.",
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
+          }
+        ]
+      }
     },
     "android": {
       "package": "com.teenhive.app",
       "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
-        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#051b0e"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -34,7 +49,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/logo.png",
+          "image": "./assets/images/icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#051b0e",
@@ -48,14 +63,35 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/logo.png",
+          "icon": "./assets/images/icon.png",
           "color": "#051b0e"
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Teen Hive needs access to your photos to set a profile picture."
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "ed541f56-75e5-4750-90f3-9e64e398ee48"
+      }
+    },
+    "owner": "aanyamahajanns-organization",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/ed541f56-75e5-4750-90f3-9e64e398ee48"
     }
   }
 }

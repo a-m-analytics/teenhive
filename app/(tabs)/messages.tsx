@@ -1,9 +1,13 @@
-import Text from '@/components/Text';
+import EmptyState from '@/components/EmptyState';
+import LoadingScreen from '@/components/LoadingScreen';
+import OfflineBanner from '@/components/OfflineBanner';
 import { useAuth } from '@/context/AuthContext';
+import { ds, dsLabel } from '@/lib/design';
 import { supabase } from '@/lib/supabase';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 type Conversation = {
   id: string;
@@ -40,12 +44,12 @@ export default function MessagesTab() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchConversations = useCallback(async () => {
     if (!user) { setLoading(false); return; }
     setLoading(true);
 
-    // Get all messages involving this user, grouped by conversation partner
     const { data: msgs } = await supabase
       .from('messages')
       .select('id, sender_id, receiver_id, content, created_at, read, sender:profiles!sender_id(full_name), receiver:profiles!receiver_id(full_name)')
@@ -54,7 +58,6 @@ export default function MessagesTab() {
 
     if (!msgs) { setLoading(false); return; }
 
-    // Group by conversation partner
     const convMap = new Map<string, Conversation>();
     for (const msg of msgs) {
       const isMe = msg.sender_id === user.id;
@@ -73,60 +76,57 @@ export default function MessagesTab() {
         });
       } else {
         const existing = convMap.get(otherId)!;
-        if (!isMe && !msg.read) {
-          existing.unread_count += 1;
-        }
+        if (!isMe && !msg.read) existing.unread_count += 1;
       }
     }
 
     setConversations(Array.from(convMap.values()));
     setLoading(false);
+    setRefreshing(false);
   }, [user]);
 
   useFocusEffect(useCallback(() => { fetchConversations(); }, [fetchConversations]));
+
+  const onRefresh = () => { setRefreshing(true); fetchConversations(); };
 
   const filtered = conversations.filter((c) =>
     c.other_name.toLowerCase().includes(search.toLowerCase())
   );
 
+  if (loading) return <LoadingScreen />;
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff', paddingTop: 56 }}>
+    <View style={{ flex: 1, backgroundColor: ds.c.bg }}>
+      <OfflineBanner />
       {/* Header */}
-      <Text style={{ fontSize: 26, fontWeight: '700', color: '#111', paddingHorizontal: 24, marginBottom: 16 }}>
-        Messages
-      </Text>
+      <View style={{ paddingHorizontal: 24, paddingTop: 60, marginBottom: 24 }}>
+        <Text style={{ ...dsLabel, color: ds.c.secondary, marginBottom: 6 }}>Direct</Text>
+        <Text style={{ fontFamily: ds.f.serifBold, fontSize: 38, color: ds.c.primary, lineHeight: 44, letterSpacing: -0.5 }}>
+          Messages
+        </Text>
+      </View>
 
       {/* Search */}
-      <View style={{ marginHorizontal: 24, marginBottom: 16 }}>
+      <View style={{ marginHorizontal: 24, marginBottom: 20, flexDirection: 'row', alignItems: 'center', backgroundColor: ds.c.surfaceContainerLow, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 10 }}>
+        <Ionicons name="search-outline" size={16} color={ds.c.onSurfaceVariant} />
         <TextInput
-          style={{
-            borderWidth: 1,
-            borderColor: '#e5e5e5',
-            borderRadius: 8,
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            fontSize: 15,
-            color: '#111',
-            backgroundColor: '#fafafa',
-          }}
+          style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurface }}
           placeholder="Search conversations..."
-          placeholderTextColor="#aaa"
+          placeholderTextColor={ds.c.outlineVariant}
           value={search}
           onChangeText={setSearch}
         />
       </View>
 
-      {loading ? (
-        <ActivityIndicator size="small" color="#22c55e" style={{ marginTop: 40 }} />
-      ) : filtered.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 15, color: '#888', textAlign: 'center', paddingHorizontal: 40 }}>
-            {search ? 'No conversations match your search.' : 'No messages yet.'}
-          </Text>
-        </View>
+      {filtered.length === 0 ? (
+        <EmptyState
+          icon="chatbubbles-outline"
+          title={search ? 'No conversations match.' : 'No messages yet'}
+          subtitle={search ? 'Try a different name.' : 'Accept an application to start chatting!'}
+        />
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false}>
-          {filtered.map((conv, i) => (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ds.c.secondary} />}>
+          {filtered.map((conv) => (
             <TouchableOpacity
               key={conv.id}
               style={{
@@ -135,57 +135,36 @@ export default function MessagesTab() {
                 paddingHorizontal: 24,
                 paddingVertical: 14,
                 borderBottomWidth: 1,
-                borderBottomColor: '#f0f0f0',
+                borderBottomColor: ds.c.surfaceContainerLow,
               }}
               onPress={() => router.push(`/chat?id=${conv.other_id}&name=${encodeURIComponent(conv.other_name)}` as any)}
             >
-              {/* Avatar */}
-              <View
-                style={{
-                  width: 50,
-                  height: 50,
-                  borderRadius: 25,
-                  backgroundColor: '#f0f0f0',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginRight: 14,
-                }}
-              >
-                <Text style={{ fontSize: 17, fontWeight: '700', color: '#555' }}>
+              <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: ds.c.secondaryContainer, justifyContent: 'center', alignItems: 'center', marginRight: 14 }}>
+                <Text style={{ fontFamily: ds.f.sansBold, fontSize: 17, color: ds.c.primary }}>
                   {getInitials(conv.other_name)}
                 </Text>
               </View>
 
-              {/* Content */}
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
-                  <Text style={{ fontSize: 15, fontWeight: conv.unread_count > 0 ? '700' : '500', color: '#111' }}>
+                  <Text style={{ fontFamily: conv.unread_count > 0 ? ds.f.sansBold : ds.f.sansMedium, fontSize: 15, color: ds.c.onSurface }}>
                     {conv.other_name}
                   </Text>
-                  <Text style={{ fontSize: 12, color: '#aaa' }}>{timeAgo(conv.last_message_at)}</Text>
+                  <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.outlineVariant }}>
+                    {timeAgo(conv.last_message_at)}
+                  </Text>
                 </View>
                 <Text
                   numberOfLines={1}
-                  style={{ fontSize: 13, color: conv.unread_count > 0 ? '#555' : '#aaa', fontWeight: conv.unread_count > 0 ? '500' : '400' }}
+                  style={{ fontFamily: ds.f.sans, fontSize: 13, color: conv.unread_count > 0 ? ds.c.onSurfaceVariant : ds.c.outlineVariant }}
                 >
                   {conv.last_message}
                 </Text>
               </View>
 
-              {/* Unread dot */}
               {conv.unread_count > 0 && (
-                <View
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: 10,
-                    backgroundColor: '#22c55e',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    marginLeft: 10,
-                  }}
-                >
-                  <Text style={{ fontSize: 11, color: '#fff', fontWeight: '700' }}>
+                <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: ds.c.secondary, justifyContent: 'center', alignItems: 'center', marginLeft: 10 }}>
+                  <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: ds.c.white }}>
                     {conv.unread_count > 9 ? '9+' : conv.unread_count}
                   </Text>
                 </View>

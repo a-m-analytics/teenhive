@@ -3,8 +3,12 @@ import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { ds } from '@/lib/design';
+import { supabase } from '@/lib/supabase';
+import { trackSignUp } from '@/lib/analytics';
 
 const SKILLS = ['Babysitting', 'Tutoring', 'Yard Work', 'Pet Care', 'Tech Help', 'Cleaning', 'Errands', 'Car Washing'];
 const AVAIL  = ['Weekdays after school', 'Weekends', 'School holidays', 'Flexible'];
@@ -43,6 +47,9 @@ export default function Signup() {
   const [agreed3, setAgreed3] = useState(false);
   const [agreed4, setAgreed4] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [ageError, setAgeError] = useState('');
 
   const allChecked = agreed1 && agreed2 && agreed3 && (isTeen || agreed4);
 
@@ -67,8 +74,8 @@ export default function Signup() {
         Alert.alert('Missing info', 'Please enter your age.');
         return;
       }
-      if (isTeen && (ageNum < 13 || ageNum > 17)) {
-        Alert.alert('Error', 'Teens must be between 13 and 17 years old.');
+      if (isTeen && ageNum < 13) {
+        Alert.alert('Error', 'You must be at least 13 years old to use Teen Hive.');
         return;
       }
       if (!isTeen && ageNum < 18) {
@@ -94,18 +101,44 @@ export default function Signup() {
     }
     setLoading(true);
     try {
-      const { error } = await signUp(email.trim(), password, {
-        role: role ?? 'teen',
-        full_name: `${firstName.trim()} ${lastName.trim()}`,
-        age: parseInt(age, 10),
-        neighborhood: neighborhood.trim(),
-        bio: bio.trim() || undefined,
-        hourly_rate: isTeen && hourlyRate ? parseFloat(hourlyRate) : undefined,
-        skills: isTeen ? skills : undefined,
-        availability: isTeen ? avail : undefined,
+      const { data, error: authError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          emailRedirectTo: 'teenhive://verify-email',
+          data: {
+            full_name: `${firstName.trim()} ${lastName.trim()}`,
+            role: role ?? 'teen',
+          },
+        },
       });
-      if (error) { Alert.alert('Signup failed', error); return; }
-      router.replace(isTeen ? '/teen-setup' as any : '/(tabs)' as any);
+
+      if (authError) {
+        const isNetwork = authError.message.toLowerCase().includes('fetch') || authError.message.toLowerCase().includes('network');
+        Alert.alert('Signup failed', isNetwork ? 'Network error — your Supabase project may be paused. Visit the Supabase dashboard to resume it, then try again.' : authError.message);
+        return;
+      }
+      if (!data.user) { Alert.alert('Signup failed', 'Could not create account.'); return; }
+
+      trackSignUp(data.user.id, (role ?? 'teen') as 'teen' | 'parent');
+
+      // Save profile data regardless — Supabase trigger creates the profile row
+      await supabase.from('profiles').update({
+        age: parseInt(age, 10) || null,
+        neighborhood: neighborhood.trim() || null,
+        bio: bio.trim() || null,
+        hourly_rate: isTeen && hourlyRate ? parseFloat(hourlyRate) : null,
+        skills: isTeen ? skills : [],
+        availability: isTeen ? avail : [],
+      }).eq('id', data.user.id);
+
+      if (!data.session) {
+        // Email verification required
+        router.replace({ pathname: '/verify-email', params: { email: email.trim() } } as any);
+      } else {
+        // Auto-confirmed (e.g. dev mode) — go straight in
+        router.replace('/(tabs)' as any);
+      }
     } catch (e: any) {
       Alert.alert('Signup failed', e.message);
     } finally {
@@ -118,7 +151,7 @@ export default function Signup() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}>
       <ScrollView
         style={s.container}
         keyboardShouldPersistTaps="handled"
@@ -195,32 +228,42 @@ export default function Signup() {
             />
 
             <Text style={s.label}>PASSWORD</Text>
-            <TextInput
-              style={s.input}
-              value={password}
-              onChangeText={(t) => setPassword(t)}
-              placeholder="At least 8 characters"
-              placeholderTextColor="#9ca3af"
-              secureTextEntry={true}
-              autoComplete="off"
-              textContentType="none"
-              importantForAutofill="no"
-              returnKeyType="next"
-            />
+            <View style={s.passwordWrap}>
+              <TextInput
+                style={[s.input, { flex: 1, backgroundColor: 'transparent' }]}
+                value={password}
+                onChangeText={(t) => setPassword(t)}
+                placeholder="At least 8 characters"
+                placeholderTextColor="#9ca3af"
+                secureTextEntry={!showPassword}
+                autoComplete="off"
+                textContentType="none"
+                importantForAutofill="no"
+                returnKeyType="next"
+              />
+              <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPassword(!showPassword)}>
+                <Ionicons name={showPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#737972" />
+              </TouchableOpacity>
+            </View>
 
             <Text style={s.label}>CONFIRM PASSWORD</Text>
-            <TextInput
-              style={s.input}
-              value={confirmPassword}
-              onChangeText={(t) => setConfirmPassword(t)}
-              placeholder="Repeat password"
-              placeholderTextColor="#9ca3af"
-              secureTextEntry={true}
-              autoComplete="off"
-              textContentType="none"
-              importantForAutofill="no"
-              returnKeyType="done"
-            />
+            <View style={s.passwordWrap}>
+              <TextInput
+                style={[s.input, { flex: 1, backgroundColor: 'transparent' }]}
+                value={confirmPassword}
+                onChangeText={(t) => setConfirmPassword(t)}
+                placeholder="Repeat password"
+                placeholderTextColor="#9ca3af"
+                secureTextEntry={!showConfirmPassword}
+                autoComplete="off"
+                textContentType="none"
+                importantForAutofill="no"
+                returnKeyType="done"
+              />
+              <TouchableOpacity style={s.eyeBtn} onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+                <Ionicons name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#737972" />
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -234,16 +277,25 @@ export default function Signup() {
             <TextInput
               style={s.input}
               value={age}
-              onChangeText={(t) => setAge(t.replace(/\D/g, ''))}
-              placeholder={isTeen ? 'e.g. 15' : 'e.g. 35'}
+              onChangeText={(t) => {
+                const v = t.replace(/\D/g, '');
+                setAge(v);
+                if (!v) { setAgeError(''); return; }
+                const n = parseInt(v, 10);
+                if (isTeen && n < 13) setAgeError('You must be at least 13 to use Teen Hive');
+                else if (!isTeen && n < 18) setAgeError('Parents must be 18 or older');
+                else setAgeError('');
+              }}
+              placeholder={isTeen ? 'e.g. 16' : 'e.g. 35'}
               placeholderTextColor="#9ca3af"
               keyboardType="number-pad"
-              maxLength={2}
+              maxLength={3}
               autoComplete="off"
-              textContentType="none"
+              textContentType="oneTimeCode"
               importantForAutofill="no"
               returnKeyType="next"
             />
+            {ageError ? <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 12, color: '#ef4444', marginTop: 6 }}>{ageError}</Text> : null}
 
             <Text style={s.label}>NEIGHBORHOOD</Text>
             <TextInput
@@ -254,12 +306,13 @@ export default function Signup() {
               placeholderTextColor="#9ca3af"
               autoCapitalize="words"
               autoComplete="off"
-              textContentType="none"
+              textContentType="addressCityAndState"
               importantForAutofill="no"
               returnKeyType="next"
             />
+            <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#737972', marginTop: 6 }}>We use this to show you nearby jobs</Text>
 
-            <Text style={s.label}>{isTeen ? 'ABOUT YOU' : 'ABOUT YOUR FAMILY'} <Text style={{ color: '#9ca3af', fontWeight: '400' }}>(optional)</Text></Text>
+            <Text style={s.label}>{isTeen ? 'ABOUT YOU' : 'ABOUT YOUR FAMILY'} <Text style={{ fontFamily: ds.f.sans, color: '#9ca3af' }}>(optional)</Text></Text>
             <TextInput
               style={[s.input, s.textArea]}
               value={bio}
@@ -274,19 +327,23 @@ export default function Signup() {
 
             {isTeen && (
               <>
-                <Text style={s.label}>HOURLY RATE <Text style={{ color: '#9ca3af', fontWeight: '400' }}>(optional)</Text></Text>
-                <TextInput
-                  style={s.input}
-                  value={hourlyRate}
-                  onChangeText={(t) => setHourlyRate(t.replace(/[^0-9.]/g, ''))}
-                  placeholder="e.g. 15"
-                  placeholderTextColor="#9ca3af"
-                  keyboardType="decimal-pad"
-                  autoComplete="off"
-                  textContentType="none"
-                  importantForAutofill="no"
-                  returnKeyType="done"
-                />
+                <Text style={s.label}>HOURLY RATE <Text style={{ fontFamily: ds.f.sans, color: '#9ca3af' }}>(optional)</Text></Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#eef6ef', borderRadius: 12 }}>
+                  <Text style={{ paddingLeft: 16, fontSize: 16, color: '#051b0e', fontFamily: ds.f.serifBold }}>$</Text>
+                  <TextInput
+                    style={[s.input, { flex: 1, backgroundColor: 'transparent' }]}
+                    value={hourlyRate}
+                    onChangeText={(t) => setHourlyRate(t.replace(/[^0-9.]/g, ''))}
+                    placeholder="15"
+                    placeholderTextColor="#9ca3af"
+                    keyboardType="decimal-pad"
+                    autoComplete="off"
+                    textContentType="none"
+                    importantForAutofill="no"
+                    returnKeyType="done"
+                  />
+                  <Text style={{ paddingRight: 16, fontSize: 13, color: '#737972', fontFamily: ds.f.sans }}>/hr</Text>
+                </View>
 
                 <Text style={s.label}>YOUR SKILLS</Text>
                 <View style={s.chips}>
@@ -324,7 +381,7 @@ export default function Signup() {
 
             {!isTeen && (
               <>
-                <Text style={s.label}>NUMBER OF KIDS <Text style={{ color: '#9ca3af', fontWeight: '400' }}>(optional)</Text></Text>
+                <Text style={s.label}>NUMBER OF KIDS <Text style={{ fontFamily: ds.f.sans, color: '#9ca3af' }}>(optional)</Text></Text>
                 <TextInput
                   style={s.input}
                   value={numberOfKids}
@@ -339,7 +396,7 @@ export default function Signup() {
                   returnKeyType="next"
                 />
 
-                <Text style={s.label}>KIDS' AGE GROUPS <Text style={{ color: '#9ca3af', fontWeight: '400' }}>(optional)</Text></Text>
+                <Text style={s.label}>KIDS' AGE GROUPS <Text style={{ fontFamily: ds.f.sans, color: '#9ca3af' }}>(optional)</Text></Text>
                 <View style={s.chips}>
                   {KIDS_AGES.map(a => {
                     const on = kidsAges.includes(a);
@@ -355,7 +412,7 @@ export default function Signup() {
                   })}
                 </View>
 
-                <Text style={s.label}>HOME TYPE <Text style={{ color: '#9ca3af', fontWeight: '400' }}>(optional)</Text></Text>
+                <Text style={s.label}>HOME TYPE <Text style={{ fontFamily: ds.f.sans, color: '#9ca3af' }}>(optional)</Text></Text>
                 <View style={s.chips}>
                   {HOME_TYPES.map(h => {
                     const on = homeType === h;
@@ -412,11 +469,11 @@ export default function Signup() {
             ))}
 
             <View style={{ backgroundColor: '#eef6ef', borderRadius: 12, padding: 16, marginTop: 8 }}>
-              <Text style={{ fontSize: 13, color: '#737972', lineHeight: 20 }}>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: '#737972', lineHeight: 20 }}>
                 By creating an account you agree to our{' '}
-                <Text style={{ color: '#735c00', fontWeight: '600' }} onPress={() => router.push('/terms' as any)}>Terms of Service</Text>
+                <Text style={{ fontFamily: ds.f.sansSemiBold, color: '#735c00' }} onPress={() => router.push('/terms' as any)}>Terms of Service</Text>
                 {' and '}
-                <Text style={{ color: '#735c00', fontWeight: '600' }} onPress={() => router.push('/privacy' as any)}>Privacy Policy</Text>.
+                <Text style={{ fontFamily: ds.f.sansSemiBold, color: '#735c00' }} onPress={() => router.push('/privacy' as any)}>Privacy Policy</Text>.
               </Text>
             </View>
           </View>
@@ -451,28 +508,29 @@ const s = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 16,
   },
-  back: { color: '#735c00', fontSize: 14, fontWeight: '600' },
-  logo: { fontSize: 18, fontWeight: '700', fontStyle: 'italic', color: '#051b0e' },
-  stepText: { fontSize: 11, color: '#735c00', fontWeight: '700', letterSpacing: 1 },
+  back: { fontFamily: ds.f.sansSemiBold, color: '#735c00', fontSize: 14 },
+  logo: { fontFamily: ds.f.serifBold, fontSize: 20, color: '#051b0e' },
+  stepText: { fontFamily: ds.f.sansSemiBold, fontSize: 11, color: '#735c00', letterSpacing: 2, textTransform: 'uppercase' },
   progressBg: {
     height: 3, backgroundColor: '#e8f0e9',
     marginHorizontal: 24, borderRadius: 2, marginBottom: 32,
   },
   progressFill: { height: 3, backgroundColor: '#735c00', borderRadius: 2 },
   form: { paddingHorizontal: 24 },
-  title: { fontSize: 32, fontWeight: '700', fontStyle: 'italic', color: '#051b0e', marginBottom: 8 },
-  subtitle: { fontSize: 15, color: '#737972', marginBottom: 32 },
+  title: { fontFamily: ds.f.serifBold, fontSize: 38, color: '#051b0e', marginBottom: 8, lineHeight: 44, letterSpacing: -0.5 },
+  subtitle: { fontFamily: ds.f.sansMedium, fontSize: 15, color: '#737972', marginBottom: 32, lineHeight: 22 },
   row: { flexDirection: 'row', gap: 12 },
   label: {
-    fontSize: 11, fontWeight: '700', color: '#434843',
-    letterSpacing: 1.5, marginBottom: 8, marginTop: 20,
+    fontFamily: ds.f.sansSemiBold, fontSize: 11, color: '#434843',
+    letterSpacing: 2, textTransform: 'uppercase', marginBottom: 8, marginTop: 20,
   },
   input: {
+    fontFamily: ds.f.sansMedium,
     backgroundColor: '#eef6ef',
-    borderRadius: 12,
+    borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 16,
-    fontSize: 16,
+    fontSize: 15,
     color: '#161d19',
   },
   textArea: {
@@ -483,25 +541,35 @@ const s = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     borderWidth: 1.5, borderColor: '#c3c8c1', borderRadius: 9999,
-    paddingHorizontal: 16, paddingVertical: 8,
+    paddingHorizontal: 16, paddingVertical: 9,
     backgroundColor: '#ffffff',
   },
   chipOn: { borderColor: '#735c00', backgroundColor: '#fed65b' },
-  chipText: { fontSize: 13, fontWeight: '600', color: '#434843' },
-  chipTextOn: { color: '#051b0e' },
+  chipText: { fontFamily: ds.f.sansMedium, fontSize: 13, color: '#434843' },
+  chipTextOn: { fontFamily: ds.f.sansBold, color: '#051b0e' },
   button: {
     backgroundColor: '#051b0e',
     marginHorizontal: 24, marginTop: 32,
-    borderRadius: 100, paddingVertical: 18, alignItems: 'center',
+    borderRadius: 9999, paddingVertical: 18, alignItems: 'center',
   },
-  buttonText: { color: '#ffffff', fontSize: 15, fontWeight: '700', letterSpacing: 1 },
+  buttonText: { fontFamily: ds.f.sansBold, color: '#ffffff', fontSize: 15, letterSpacing: 1.5 },
   checkRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16, marginTop: 4 },
   checkbox: {
-    width: 22, height: 22, borderRadius: 6, borderWidth: 2,
+    width: 24, height: 24, borderRadius: 6, borderWidth: 2,
     borderColor: '#c3c8c1', alignItems: 'center', justifyContent: 'center',
     marginTop: 2, flexShrink: 0,
   },
   checkboxChecked: { backgroundColor: '#735c00', borderColor: '#735c00' },
-  checkmark: { color: 'white', fontSize: 13, fontWeight: '700' },
-  checkText: { flex: 1, fontSize: 14, color: '#434843', lineHeight: 20 },
+  checkmark: { fontFamily: ds.f.sansBold, color: 'white', fontSize: 13 },
+  checkText: { fontFamily: ds.f.sansMedium, flex: 1, fontSize: 14, color: '#434843', lineHeight: 21 },
+  passwordWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eef6ef',
+    borderRadius: 16,
+  },
+  eyeBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+  },
 });

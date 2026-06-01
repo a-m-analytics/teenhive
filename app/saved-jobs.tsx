@@ -1,9 +1,17 @@
-import Text from '@/components/Text';
 import { useAuth } from '@/context/AuthContext';
+import { ds } from '@/lib/design';
 import { supabase } from '@/lib/supabase';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 type SavedJob = {
   id: string;
@@ -46,30 +54,39 @@ export default function SavedJobs() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#fff', paddingTop: 56 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 24, marginBottom: 24 }}>
-        <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 14 }}>
-          <Text style={{ fontSize: 24, color: '#22c55e' }}>←</Text>
+    <View style={s.container}>
+      {/* Header */}
+      <View style={s.header}>
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="chevron-back" size={24} color={ds.c.primary} />
         </TouchableOpacity>
-        <Text style={{ fontSize: 22, fontWeight: '700', color: '#111' }}>Saved Jobs</Text>
+        <Text style={s.headerTitle}>Saved Jobs</Text>
+        <View style={{ width: 40 }} />
       </View>
 
       {loading ? (
-        <ActivityIndicator size="small" color="#22c55e" style={{ marginTop: 40 }} />
+        <View style={s.centerWrap}>
+          <ActivityIndicator size="large" color={ds.c.secondary} />
+        </View>
       ) : saved.length === 0 ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 }}>
-          <Text style={{ fontSize: 15, color: '#888', textAlign: 'center', marginBottom: 20 }}>
-            No saved jobs yet. Bookmark jobs from the home feed.
+        <View style={s.emptyWrap}>
+          <View style={s.emptyIcon}>
+            <Ionicons name="bookmark-outline" size={36} color={ds.c.secondary} />
+          </View>
+          <Text style={s.emptyTitle}>No saved jobs yet.</Text>
+          <Text style={s.emptySubtitle}>
+            Bookmark jobs from the home feed to keep track of ones you're interested in.
           </Text>
-          <TouchableOpacity
-            style={{ backgroundColor: '#22c55e', borderRadius: 8, height: 52, paddingHorizontal: 28, justifyContent: 'center', alignItems: 'center' }}
-            onPress={() => router.back()}
-          >
-            <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Browse Jobs</Text>
+          <TouchableOpacity style={s.browseBtn} onPress={() => router.back()}>
+            <Text style={s.browseBtnText}>BROWSE JOBS</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 40 }}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 48, paddingTop: 8 }}
+        >
+          <Text style={s.countText}>{saved.length} saved {saved.length === 1 ? 'job' : 'jobs'}</Text>
           {saved.map((item) => {
             const job = item.job;
             if (!job) return null;
@@ -77,55 +94,62 @@ export default function SavedJobs() {
             return (
               <TouchableOpacity
                 key={item.id}
-                style={{
-                  borderWidth: 1,
-                  borderColor: '#f0f0f0',
-                  borderRadius: 12,
-                  padding: 16,
-                  marginBottom: 12,
-                  backgroundColor: '#fff',
-                  opacity: isOpen ? 1 : 0.6,
-                }}
+                style={[s.card, !isOpen && { opacity: 0.55 }]}
                 onPress={() => isOpen && router.push(`/job-detail?id=${job.id}` as any)}
+                activeOpacity={isOpen ? 0.7 : 1}
               >
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <View style={s.cardTop}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#111', marginBottom: 4 }}>{job.title}</Text>
-                    <Text style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>
-                      {job.parent?.full_name ?? 'Parent'}
-                      {job.parent?.is_verified ? '  ·  Verified' : ''}
-                    </Text>
+                    <Text style={s.jobTitle} numberOfLines={2}>{job.title}</Text>
+                    <View style={s.parentRow}>
+                      <Text style={s.parentName}>{job.parent?.full_name ?? 'Parent'}</Text>
+                      {job.parent?.is_verified && (
+                        <>
+                          <Text style={s.dot}>·</Text>
+                          <Ionicons name="shield-checkmark" size={13} color={ds.c.secondary} />
+                          <Text style={s.verifiedText}>Verified</Text>
+                        </>
+                      )}
+                    </View>
                   </View>
                   <TouchableOpacity
-                    style={{ padding: 4 }}
+                    style={s.removeBtn}
                     onPress={() => unsave(item.id)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <Text style={{ fontSize: 13, color: '#ef4444', fontWeight: '600' }}>Remove</Text>
+                    <Ionicons name="bookmark" size={20} color={ds.c.secondary} />
                   </TouchableOpacity>
                 </View>
 
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <View style={{ borderWidth: 1, borderColor: '#e5e5e5', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 }}>
-                    <Text style={{ fontSize: 12, color: '#666' }}>{job.category}</Text>
+                <View style={s.tagRow}>
+                  <View style={s.categoryChip}>
+                    <Text style={s.categoryChipText}>{job.category}</Text>
                   </View>
-                  <Text style={{ fontSize: 14, color: '#22c55e', fontWeight: '600' }}>
-                    ${job.pay_rate}{job.pay_type === 'hourly' ? '/hr' : ' flat'}
-                  </Text>
+                  <View style={s.payChip}>
+                    <Text style={s.payText}>
+                      ${job.pay_rate}{job.pay_type === 'hourly' ? '/hr' : ' flat'}
+                    </Text>
+                  </View>
                   {job.location_area ? (
-                    <Text style={{ fontSize: 13, color: '#aaa' }}>{job.location_area}</Text>
+                    <View style={s.locationChip}>
+                      <Ionicons name="location-outline" size={11} color={ds.c.onSurfaceVariant} />
+                      <Text style={s.locationText}>{job.location_area}</Text>
+                    </View>
                   ) : null}
                 </View>
 
                 {!isOpen && (
-                  <Text style={{ fontSize: 12, color: '#ef4444', marginTop: 8 }}>This job is no longer open</Text>
+                  <View style={s.closedBadge}>
+                    <Text style={s.closedBadgeText}>No longer accepting applications</Text>
+                  </View>
                 )}
 
                 {isOpen && (
                   <TouchableOpacity
-                    style={{ backgroundColor: '#22c55e', borderRadius: 8, height: 40, justifyContent: 'center', alignItems: 'center', marginTop: 12 }}
+                    style={s.applyBtn}
                     onPress={() => router.push(`/job-detail?id=${job.id}` as any)}
                   >
-                    <Text style={{ color: '#fff', fontSize: 14, fontWeight: '600' }}>View & Apply</Text>
+                    <Text style={s.applyBtnText}>VIEW & APPLY</Text>
                   </TouchableOpacity>
                 )}
               </TouchableOpacity>
@@ -136,3 +160,82 @@ export default function SavedJobs() {
     </View>
   );
 }
+
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: ds.c.bg },
+  header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingTop: 60, paddingHorizontal: 20, paddingBottom: 16,
+  },
+  backBtn: { width: 40, height: 40, justifyContent: 'center' },
+  headerTitle: { fontFamily: ds.f.serifBold, fontSize: 20, color: ds.c.primary },
+
+  centerWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
+  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
+  emptyIcon: {
+    width: 72, height: 72, borderRadius: 36,
+    backgroundColor: ds.c.surfaceContainerLow,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 20,
+  },
+  emptyTitle: { fontFamily: ds.f.serifBold, fontSize: 24, color: ds.c.primary, marginBottom: 10 },
+  emptySubtitle: {
+    fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurfaceVariant,
+    textAlign: 'center', lineHeight: 21, marginBottom: 32,
+  },
+  browseBtn: {
+    backgroundColor: ds.c.primary, borderRadius: 100,
+    paddingVertical: 16, paddingHorizontal: 32, alignItems: 'center',
+  },
+  browseBtnText: { fontFamily: ds.f.sansBold, fontSize: 13, color: '#fff', letterSpacing: 1 },
+
+  countText: {
+    fontFamily: ds.f.sansMedium, fontSize: 13, color: ds.c.onSurfaceVariant,
+    marginBottom: 14,
+  },
+
+  card: {
+    backgroundColor: ds.c.surfaceContainerLow,
+    borderRadius: 20, padding: 18, marginBottom: 14,
+  },
+  cardTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
+  jobTitle: {
+    fontFamily: ds.f.sansBold, fontSize: 16, color: ds.c.primary,
+    marginBottom: 4, lineHeight: 22,
+  },
+  parentRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  parentName: { fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant },
+  dot: { fontFamily: ds.f.sans, fontSize: 13, color: ds.c.outlineVariant },
+  verifiedText: { fontFamily: ds.f.sansMedium, fontSize: 12, color: ds.c.secondary },
+  removeBtn: { marginLeft: 8, padding: 4 },
+
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+  categoryChip: {
+    backgroundColor: ds.c.surfaceContainerHigh,
+    borderRadius: 100, paddingHorizontal: 12, paddingVertical: 5,
+  },
+  categoryChipText: { fontFamily: ds.f.sansMedium, fontSize: 12, color: ds.c.onSurfaceVariant },
+  payChip: {
+    backgroundColor: ds.c.secondaryContainer,
+    borderRadius: 100, paddingHorizontal: 12, paddingVertical: 5,
+  },
+  payText: { fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.secondary },
+  locationChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: ds.c.surfaceContainerHigh,
+    borderRadius: 100, paddingHorizontal: 10, paddingVertical: 5,
+  },
+  locationText: { fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant },
+
+  closedBadge: {
+    marginTop: 12, backgroundColor: '#fef2f2', borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 8, alignSelf: 'flex-start',
+  },
+  closedBadgeText: { fontFamily: ds.f.sansMedium, fontSize: 12, color: '#ef4444' },
+
+  applyBtn: {
+    marginTop: 14, backgroundColor: ds.c.primary,
+    borderRadius: 100, paddingVertical: 14, alignItems: 'center',
+  },
+  applyBtnText: { fontFamily: ds.f.sansBold, fontSize: 13, color: '#fff', letterSpacing: 1 },
+});

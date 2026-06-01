@@ -1,83 +1,202 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { FlatList, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
-import Text from '@/components/Text';
+import EmptyState from '@/components/EmptyState';
+import LoadingScreen from '@/components/LoadingScreen';
+import OfflineBanner from '@/components/OfflineBanner';
+import { useAuth } from '@/context/AuthContext';
+import { ds, dsLabel, dsSecondaryLabel } from '@/lib/design';
+import { supabase } from '@/lib/supabase';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 
-const INVITES = [
-  { id: 'i1', title: 'Dog Walking', parent: 'Mike R.' },
-  { id: 'i2', title: 'Tech Help', parent: 'Carol S.' },
-];
-const JOBS = [
-  { id: '1', title: 'Lawn Mowing', category: 'Yard Work', distance: '0.2 miles', pay: '$20/hr' },
-  { id: '2', title: 'Babysitting', category: 'Childcare', distance: '0.5 miles', pay: '$15/hr' },
-  { id: '3', title: 'Math Tutoring', category: 'Tutoring', distance: '0.8 miles', pay: '$25/hr' },
-  { id: '4', title: 'Dog Walking', category: 'Pet Care', distance: '0.3 miles', pay: '$12/hr' },
-  { id: '5', title: 'Phone Setup Help', category: 'Tech Help', distance: '1.1 miles', pay: '$18/hr' },
-];
+type Job = {
+  id: string;
+  title: string;
+  category: string;
+  pay_rate: number;
+  pay_type: string;
+  location_area: string | null;
+  created_at: string;
+  parent: { full_name: string } | null;
+};
 
-export default function TeenHome() {
-  const { name } = useLocalSearchParams<{ name: string }>();
-  const router = useRouter();
-  return (
-    <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: 40 }}>
-      <View style={s.headerRow}>
-        <Text style={s.header}>Hi {name} 👋</Text>
-        <TouchableOpacity onPress={() => router.push('/notifications')}><Text style={s.icon}>🔔</Text></TouchableOpacity>
-        <TouchableOpacity onPress={() => router.push('/messages')}><Text style={s.icon}>💬</Text></TouchableOpacity>
-      </View>
-      <TextInput style={s.search} placeholder="🔍  Search jobs..." />
+type Invite = {
+  id: string;
+  job_id: string;
+  job: { id: string; title: string; category: string; pay_rate: number; pay_type: string } | null;
+  parent: { full_name: string } | null;
+};
 
-      <Text style={s.section}>Invited Jobs 🎉</Text>
-      <FlatList horizontal data={INVITES} keyExtractor={i => i.id} showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 8 }}
-        renderItem={({ item }) => (
-          <View style={s.inviteCard}>
-            <Text style={s.inviteTitle}>{item.title}</Text>
-            <Text style={s.inviteParent}>From {item.parent}</Text>
-            <TouchableOpacity style={s.inviteBtn} onPress={() => router.push(`/job-detail?id=${JOBS.find(j => j.title === item.title)?.id ?? '1'}`)}>
-              <Text style={s.inviteBtnText}>View & Accept</Text>
-            </TouchableOpacity>
-          </View>
-        )} />
-
-      <Text style={s.section}>Jobs Near You</Text>
-      {JOBS.map(job => (
-        <View key={job.id} style={s.card}>
-          <View style={s.cardTop}>
-            <Text style={s.jobTitle}>{job.title}</Text>
-            <Text style={s.pay}>{job.pay}</Text>
-          </View>
-          <View style={s.cardBottom}>
-            <Text style={s.tag}>{job.category}</Text>
-            <Text style={s.distance}>{job.distance}</Text>
-          </View>
-          <TouchableOpacity style={s.viewBtn} onPress={() => router.push(`/job-detail?id=${job.id}`)}>
-            <Text style={s.viewBtnText}>View Job</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
-    </ScrollView>
-  );
+function formatPay(rate: number, type: string) {
+  return `$${rate}${type === 'hourly' ? '/hr' : ' flat'}`;
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f5f5', paddingTop: 60, paddingHorizontal: 16 },
-  headerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
-  header: { fontSize: 24, fontWeight: '700', flex: 1 },
-  icon: { fontSize: 22, marginLeft: 12 },
-  search: { backgroundColor: '#fff', borderRadius: 10, padding: 12, fontSize: 15, marginBottom: 16, borderWidth: 1, borderColor: '#e5e5e5' },
-  section: { fontSize: 15, fontWeight: '700', marginBottom: 10 },
-  inviteCard: { backgroundColor: '#fef9c3', borderRadius: 12, padding: 14, marginRight: 12, width: 160 },
-  inviteTitle: { fontWeight: '700', fontSize: 15, marginBottom: 4 },
-  inviteParent: { fontSize: 12, color: '#666', marginBottom: 10 },
-  inviteBtn: { backgroundColor: '#f59e0b', borderRadius: 8, padding: 8, alignItems: 'center' },
-  inviteBtnText: { color: '#fff', fontWeight: '600', fontSize: 12 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 12 },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  jobTitle: { fontSize: 16, fontWeight: '600' },
-  pay: { fontSize: 15, fontWeight: '700', color: '#3b82f6' },
-  cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  tag: { backgroundColor: '#eff6ff', color: '#3b82f6', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, fontSize: 12, fontWeight: '600' },
-  distance: { fontSize: 12, color: '#888' },
-  viewBtn: { backgroundColor: '#3b82f6', borderRadius: 8, padding: 10, alignItems: 'center' },
-  viewBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
-});
+export default function TeenHome() {
+  const router = useRouter();
+  const { user, profile } = useAuth();
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [invites, setInvites] = useState<Invite[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchData = useCallback(async () => {
+    if (!user) { setLoading(false); return; }
+
+    const [jobsRes, invitesRes] = await Promise.all([
+      supabase
+        .from('jobs')
+        .select('id, title, category, pay_rate, pay_type, location_area, created_at, parent:profiles!parent_id(full_name)')
+        .eq('status', 'open')
+        .order('created_at', { ascending: false })
+        .limit(20),
+      supabase
+        .from('applications')
+        .select('id, job_id, job:jobs!job_id(id, title, category, pay_rate, pay_type), parent:profiles!parent_id(full_name)')
+        .eq('teen_id', user.id)
+        .eq('status', 'invited'),
+    ]);
+
+    if (jobsRes.data) setJobs(jobsRes.data as unknown as Job[]);
+    if (invitesRes.data) setInvites(invitesRes.data as unknown as Invite[]);
+
+    // Unread notifications count
+    const notifRes = await supabase
+      .from('notifications')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('read', false);
+    setUnreadCount((notifRes as any).count ?? 0);
+
+    setLoading(false);
+    setRefreshing(false);
+  }, [user]);
+
+  useFocusEffect(useCallback(() => { fetchData(); }, [fetchData]));
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchData();
+  };
+
+  const firstName = profile?.full_name?.split(' ')[0] ?? 'there';
+
+  if (loading) return <LoadingScreen />;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: ds.c.bg }}>
+      <OfflineBanner />
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 110 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={ds.c.secondary} />}
+      >
+        {/* Header */}
+        <View style={{ paddingHorizontal: 24, paddingTop: 60, marginBottom: 28 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View>
+              <Text style={{ ...dsLabel, color: ds.c.secondary, marginBottom: 6 }}>Welcome back</Text>
+              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 38, color: ds.c.primary, lineHeight: 44, letterSpacing: -0.5 }}>
+                Hi, {firstName}.
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10, paddingTop: 8 }}>
+              <TouchableOpacity
+                style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: ds.c.surfaceContainerLow, justifyContent: 'center', alignItems: 'center' }}
+                onPress={() => router.push('/notifications' as any)}
+              >
+                <Ionicons name="notifications-outline" size={20} color={ds.c.onSurfaceVariant} />
+                {unreadCount > 0 && (
+                  <View style={{ position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: ds.c.error }} />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: ds.c.surfaceContainerLow, justifyContent: 'center', alignItems: 'center' }}
+                onPress={() => router.push('/(tabs)/messages' as any)}
+              >
+                <Ionicons name="chatbubble-outline" size={20} color={ds.c.onSurfaceVariant} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        {/* Invites */}
+        {invites.length > 0 && (
+          <View style={{ marginBottom: 28 }}>
+            <View style={{ paddingHorizontal: 24, marginBottom: 14 }}>
+              <Text style={{ ...dsSecondaryLabel, marginBottom: 4 }}>You've been invited</Text>
+              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 22, color: ds.c.primary, letterSpacing: -0.3 }}>Invites</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}>
+              {invites.map((invite) => {
+                if (!invite.job) return null;
+                return (
+                  <TouchableOpacity
+                    key={invite.id}
+                    style={{ backgroundColor: ds.c.secondaryContainer, borderRadius: 24, padding: 20, width: 180 }}
+                    onPress={() => router.push(`/job-detail?id=${invite.job?.id}` as any)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ fontFamily: ds.f.sans, fontSize: 11, color: 'rgba(5,27,14,0.4)', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 }}>Invited by</Text>
+                    <Text style={{ fontFamily: ds.f.serifBold, fontSize: 18, color: ds.c.primary, lineHeight: 22, marginBottom: 4 }}>{invite.job.title}</Text>
+                    <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 13, color: 'rgba(5,27,14,0.55)', marginBottom: 12 }}>{invite.parent?.full_name}</Text>
+                    <Text style={{ fontFamily: ds.f.sansBold, fontSize: 14, color: ds.c.primary }}>
+                      {formatPay(invite.job.pay_rate, invite.job.pay_type)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Jobs near you */}
+        <View style={{ paddingHorizontal: 24, marginBottom: 16 }}>
+          <Text style={{ ...dsSecondaryLabel, marginBottom: 6 }}>Available Now</Text>
+          <Text style={{ fontFamily: ds.f.serifBold, fontSize: 26, color: ds.c.primary, letterSpacing: -0.3 }}>Jobs Near You</Text>
+        </View>
+
+        {jobs.length === 0 ? (
+          <EmptyState
+            icon="briefcase-outline"
+            title="No jobs near you yet"
+            subtitle="Check back soon or post your services to get invited"
+            buttonText="Post My Services"
+            onButtonPress={() => router.push('/post-service' as any)}
+          />
+        ) : (
+          jobs.map((job) => (
+            <TouchableOpacity
+              key={job.id}
+              style={{ marginHorizontal: 24, marginBottom: 12, backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 20 }}
+              onPress={() => router.push(`/job-detail?id=${job.id}` as any)}
+              activeOpacity={0.8}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+                <Text style={{ fontFamily: ds.f.serifBold, fontSize: 18, color: ds.c.primary, letterSpacing: -0.3, flex: 1, lineHeight: 24 }}>{job.title}</Text>
+                <View style={{ backgroundColor: ds.c.secondaryContainer, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 5, marginLeft: 10 }}>
+                  <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: ds.c.primary }}>{formatPay(job.pay_rate, job.pay_type)}</Text>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ backgroundColor: ds.c.surfaceContainerHigh, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 4 }}>
+                  <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 12, color: ds.c.onSurfaceVariant }}>{job.category}</Text>
+                </View>
+                {job.location_area ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <Ionicons name="location-outline" size={12} color={ds.c.onSurfaceVariant} />
+                    <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>{job.location_area}</Text>
+                  </View>
+                ) : null}
+                {job.parent ? (
+                  <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>· {job.parent.full_name}</Text>
+                ) : null}
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
+      </ScrollView>
+    </View>
+  );
+}

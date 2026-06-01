@@ -2,6 +2,7 @@ import GradientButton from '@/components/GradientButton';
 import { useAuth } from '@/context/AuthContext';
 import { ds, dsLabel } from '@/lib/design';
 import { submitReview } from '@/lib/reviews';
+import { trackReviewSubmitted } from '@/lib/analytics';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -27,6 +28,7 @@ export default function ReviewModal() {
     const { error } = await submitReview(user.id, revieweeId, jobId, stars, comment);
     setSubmitting(false);
     if (error) { Alert.alert('Error', error); return; }
+    trackReviewSubmitted(user.id, revieweeId, jobId, stars);
     Alert.alert('Review submitted', 'Thank you for your feedback!', [
       { text: 'OK', onPress: () => router.back() },
     ]);
@@ -48,10 +50,15 @@ export default function ReviewModal() {
         <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 16 }}>Your Rating</Text>
 
         {/* Star selector */}
-        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 8 }}>
+        <View style={{ flexDirection: 'row', gap: 4, marginBottom: 8 }}>
           {[1, 2, 3, 4, 5].map((n) => (
-            <TouchableOpacity key={n} onPress={() => setStars(n)} style={{ padding: 4 }}>
-              <Text style={{ fontSize: 42, color: n <= stars ? '#f59e0b' : ds.c.outlineVariant }}>★</Text>
+            <TouchableOpacity
+              key={n}
+              onPress={() => setStars(n)}
+              style={{ minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' }}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+            >
+              <Text style={{ fontSize: 40, color: n <= stars ? '#f59e0b' : ds.c.surfaceContainerHigh }}>★</Text>
             </TouchableOpacity>
           ))}
         </View>

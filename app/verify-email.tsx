@@ -1,160 +1,107 @@
-import { currentUser } from '@/lib/user';
+import { ds } from '@/lib/design';
+import { supabase } from '@/lib/supabase';
+import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import {
-  Animated,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import Text from '@/components/Text';
-
-const VALID_CODE = '123456';
+import { Alert, Text, TouchableOpacity, View } from 'react-native';
 
 export default function VerifyEmail() {
   const router = useRouter();
   const { email } = useLocalSearchParams<{ email: string }>();
-  const displayEmail = email ?? currentUser.name + '@example.com';
-
-  const [digits, setDigits] = useState(['', '', '', '', '', '']);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
-  const [cooldown, setCooldown] = useState(60);
-  const inputRefs = useRef<(TextInput | null)[]>([]);
-  const shakeAnim = useRef(new Animated.Value(0)).current;
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [resending, setResending] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    timer.current = setInterval(() => {
-      setCooldown(c => { if (c <= 1) { clearInterval(timer.current!); return 0; } return c - 1; });
-    }, 1000);
-    return () => { if (timer.current) clearInterval(timer.current); };
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
 
-  const resetCooldown = () => {
-    setCooldown(60);
-    timer.current = setInterval(() => {
-      setCooldown(c => { if (c <= 1) { clearInterval(timer.current!); return 0; } return c - 1; });
+  const startCountdown = () => {
+    setCountdown(60);
+    timerRef.current = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) { clearInterval(timerRef.current!); return 0; }
+        return prev - 1;
+      });
     }, 1000);
   };
 
-  const shake = () => {
-    Animated.sequence([
-      Animated.timing(shakeAnim, { toValue: 10, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -10, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: -8, duration: 60, useNativeDriver: true }),
-      Animated.timing(shakeAnim, { toValue: 0, duration: 60, useNativeDriver: true }),
-    ]).start();
+  const handleResend = async () => {
+    if (!email || countdown > 0) return;
+    setResending(true);
+    try {
+      const { error } = await supabase.auth.resend({ type: 'signup', email });
+      if (error) throw error;
+      startCountdown();
+      Alert.alert('Sent!', 'Check your email for the verification link.');
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setResending(false);
+    }
   };
 
-  const verify = (code: string) => {
-    if (code === VALID_CODE) {
-      setError('');
-      setSuccess(true);
-      setTimeout(() => router.replace('/(tabs)' as any), 1800);
+  const handleCheckVerification = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      const role = session.user.user_metadata?.role;
+      if (role === 'parent') {
+        router.replace('/parent-setup' as any);
+      } else {
+        router.replace('/teen-setup' as any);
+      }
     } else {
-      shake();
-      setError('Incorrect code, try again.');
-      setDigits(['', '', '', '', '', '']);
-      inputRefs.current[0]?.focus();
+      Alert.alert(
+        'Not verified yet',
+        'Please check your email and click the verification link first.'
+      );
     }
   };
-
-  const handleInput = (text: string, idx: number) => {
-    const val = text.slice(-1);
-    const next = [...digits];
-    next[idx] = val;
-    setDigits(next);
-    setError('');
-    if (val && idx < 5) { inputRefs.current[idx + 1]?.focus(); }
-    if (idx === 5 && val) {
-      const code = [...next.slice(0, 5), val].join('');
-      if (code.length === 6) verify(code);
-    }
-  };
-
-  const handleBackspace = (key: string, idx: number) => {
-    if (key === 'Backspace' && !digits[idx] && idx > 0) {
-      inputRefs.current[idx - 1]?.focus();
-    }
-  };
-
-  if (success) {
-    return (
-      <View style={s.successScreen}>
-        <Text style={s.successIcon}>✅</Text>
-        <Text style={s.successTitle}>Email verified!</Text>
-        <Text style={s.successSub}>Setting up your profile...</Text>
-      </View>
-    );
-  }
 
   return (
-    <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      <View style={s.inner}>
-        <Text style={s.topIcon}>📬</Text>
-        <Text style={s.title}>Verify your email</Text>
-        <Text style={s.sub}>We sent a 6-digit code to</Text>
-        <Text style={s.email}>{displayEmail}</Text>
+    <View style={{ flex: 1, backgroundColor: ds.c.bg, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }}>
 
-        <Animated.View style={[s.codeRow, { transform: [{ translateX: shakeAnim }] }]}>
-          {digits.map((d, i) => (
-            <TextInput
-              key={i}
-              ref={r => { inputRefs.current[i] = r; }}
-              style={[s.digitBox, error && s.digitBoxErr, d && s.digitBoxFilled]}
-              value={d}
-              onChangeText={t => handleInput(t, i)}
-              onKeyPress={({ nativeEvent }) => handleBackspace(nativeEvent.key, i)}
-              keyboardType="number-pad"
-              maxLength={1}
-              selectTextOnFocus
-              textAlign="center"
-            />
-          ))}
-        </Animated.View>
-
-        {error ? <Text style={s.errorText}>{error}</Text> : null}
-
-        <TouchableOpacity
-          style={[s.resendBtn, cooldown > 0 && s.resendBtnDisabled]}
-          onPress={() => { if (cooldown === 0) resetCooldown(); }}
-          disabled={cooldown > 0}
-        >
-          <Text style={[s.resendText, cooldown > 0 && s.resendDisabled]}>
-            {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
-          </Text>
-        </TouchableOpacity>
-
-        <Text style={s.hint}>Hint for testing: use code 123456</Text>
+      <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: ds.c.primaryContainer, justifyContent: 'center', alignItems: 'center', marginBottom: 28 }}>
+        <Ionicons name="mail-outline" size={40} color={ds.c.secondary} />
       </View>
-    </KeyboardAvoidingView>
+
+      <Text style={{ fontFamily: ds.f.serifBold, fontSize: 32, color: ds.c.primary, marginBottom: 12, textAlign: 'center', letterSpacing: -0.3 }}>
+        Check your email
+      </Text>
+
+      <Text style={{ fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurfaceVariant, textAlign: 'center', marginBottom: 6 }}>
+        We sent a verification link to:
+      </Text>
+      <Text style={{ fontFamily: ds.f.sansBold, fontSize: 15, color: ds.c.primary, marginBottom: 16, textAlign: 'center' }}>
+        {email}
+      </Text>
+      <Text style={{ fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurfaceVariant, textAlign: 'center', lineHeight: 21, marginBottom: 40 }}>
+        Click the link in the email to verify your account, then come back here and tap the button below.
+      </Text>
+
+      <TouchableOpacity
+        style={{ backgroundColor: ds.c.primary, borderRadius: 9999, paddingVertical: 18, alignItems: 'center', width: '100%', marginBottom: 16 }}
+        onPress={handleCheckVerification}
+      >
+        <Text style={{ fontFamily: ds.f.sansBold, fontSize: 15, color: ds.c.white, letterSpacing: 1 }}>
+          I VERIFIED MY EMAIL
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={{ paddingVertical: 12, marginBottom: 12, opacity: countdown > 0 || resending ? 0.5 : 1 }}
+        onPress={handleResend}
+        disabled={countdown > 0 || resending}
+      >
+        <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: ds.c.secondary }}>
+          {countdown > 0 ? `Resend in ${countdown}s` : resending ? 'Sending...' : 'Resend email'}
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={() => router.replace('/login' as any)}>
+        <Text style={{ fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurfaceVariant }}>Back to sign in</Text>
+      </TouchableOpacity>
+
+    </View>
   );
 }
-
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  inner: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, paddingBottom: 60 },
-  topIcon: { fontSize: 56, marginBottom: 20 },
-  title: { fontSize: 26, fontWeight: '800', color: '#0f172a', marginBottom: 8 },
-  sub: { fontSize: 15, color: '#64748b' },
-  email: { fontSize: 15, fontWeight: '700', color: '#22c55e', marginBottom: 32 },
-  codeRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  digitBox: { width: 46, height: 56, borderRadius: 12, borderWidth: 2, borderColor: '#e2e8f0', fontSize: 24, fontWeight: '800', color: '#0f172a', backgroundColor: '#f8fafc', textAlign: 'center' },
-  digitBoxFilled: { borderColor: '#22c55e', backgroundColor: '#f0fdf4' },
-  digitBoxErr: { borderColor: '#f87171', backgroundColor: '#fef2f2' },
-  errorText: { color: '#dc2626', fontSize: 14, fontWeight: '600', marginBottom: 12 },
-  resendBtn: { marginTop: 8, paddingVertical: 12 },
-  resendBtnDisabled: {},
-  resendText: { color: '#22c55e', fontSize: 15, fontWeight: '700' },
-  resendDisabled: { color: '#94a3b8' },
-  hint: { marginTop: 24, fontSize: 12, color: '#94a3b8' },
-  successScreen: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', gap: 12 },
-  successIcon: { fontSize: 72 },
-  successTitle: { fontSize: 28, fontWeight: '800', color: '#0f172a' },
-  successSub: { fontSize: 15, color: '#64748b' },
-});

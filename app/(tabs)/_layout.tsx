@@ -1,8 +1,10 @@
 import { useAuth } from '@/context/AuthContext';
 import { ds } from '@/lib/design';
+import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { ActivityIndicator, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { View } from 'react-native';
 
 const TAB_BAR_HEIGHT = 84;
 
@@ -47,15 +49,42 @@ function TabIcon({ name, focused, focusedName }: { name: any; focused: boolean; 
 }
 
 export default function TabLayout() {
-  const { profile, loading } = useAuth();
+  const { user, profile } = useAuth();
+  const [jobsBadge, setJobsBadge] = useState<number>(0);
 
-  if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: ds.c.bg }}>
-        <ActivityIndicator size="large" color={ds.c.secondary} />
-      </View>
-    );
-  }
+  useEffect(() => {
+    if (!user || !profile) return;
+    async function fetchBadge() {
+      if (profile?.role === 'teen') {
+        // Count pending invites for teen
+        const { count } = await supabase
+          .from('applications')
+          .select('id', { count: 'exact', head: true })
+          .eq('teen_id', user!.id)
+          .eq('status', 'invited');
+        setJobsBadge(count ?? 0);
+      } else if (profile?.role === 'parent') {
+        // Count pending applications on parent's jobs
+        const { data: jobs } = await supabase
+          .from('jobs')
+          .select('id')
+          .eq('parent_id', user!.id)
+          .eq('status', 'open');
+        if (jobs && jobs.length > 0) {
+          const jobIds = jobs.map((j: any) => j.id);
+          const { count } = await supabase
+            .from('applications')
+            .select('id', { count: 'exact', head: true })
+            .in('job_id', jobIds)
+            .eq('status', 'pending');
+          setJobsBadge(count ?? 0);
+        } else {
+          setJobsBadge(0);
+        }
+      }
+    }
+    fetchBadge();
+  }, [user, profile]);
 
   return (
     <Tabs screenOptions={screenOptions}>
@@ -69,8 +98,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="jobs"
         options={{
-          title: 'Jobs',
+          title: profile?.role === 'parent' ? 'Listings' : 'Jobs',
           tabBarIcon: ({ focused }) => <TabIcon name="briefcase-outline" focusedName="briefcase" focused={focused} />,
+          tabBarBadge: jobsBadge > 0 ? jobsBadge : undefined,
+          tabBarBadgeStyle: { backgroundColor: '#ef4444', fontSize: 10, minWidth: 16, height: 16, borderRadius: 8 },
         }}
       />
       <Tabs.Screen
@@ -80,6 +111,7 @@ export default function TabLayout() {
           tabBarIcon: ({ focused }) => <TabIcon name="add-circle-outline" focusedName="add-circle" focused={focused} />,
         }}
       />
+      <Tabs.Screen name="messages" options={{ href: null }} />
       <Tabs.Screen
         name="profile"
         options={{
@@ -90,7 +122,6 @@ export default function TabLayout() {
       {/* Hidden screens */}
       <Tabs.Screen name="my-jobs" options={{ href: null }} />
       <Tabs.Screen name="my-listings" options={{ href: null }} />
-      <Tabs.Screen name="messages" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -2,34 +2,80 @@ import GradientButton from '@/components/GradientButton';
 import { useAuth } from '@/context/AuthContext';
 import { ds, dsField, dsLabel } from '@/lib/design';
 import { supabase } from '@/lib/supabase';
+import { trackJobPosted } from '@/lib/analytics';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
+  Alert, KeyboardAvoidingView, Platform,
   ScrollView, Switch, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 
 const CATEGORIES = ['Babysitting', 'Tutoring', 'Yard Work', 'Pet Care', 'Tech Help', 'Cleaning', 'Errands'];
-const FREQUENCIES = ['Weekly', 'Bi-weekly', 'Monthly'];
+const DAYS = [
+  { label: 'Mon', value: 'monday' },
+  { label: 'Tue', value: 'tuesday' },
+  { label: 'Wed', value: 'wednesday' },
+  { label: 'Thu', value: 'thursday' },
+  { label: 'Fri', value: 'friday' },
+  { label: 'Sat', value: 'saturday' },
+  { label: 'Sun', value: 'sunday' },
+];
 
 export default function PostJob() {
   const router = useRouter();
   const { user } = useAuth();
+  const { jobId } = useLocalSearchParams<{ jobId?: string }>();
+  const isEditing = !!jobId;
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [payAmount, setPayAmount] = useState('');
   const [payType, setPayType] = useState<'hr' | 'flat'>('hr');
-  const [date, setDate] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [hours, setHours] = useState('');
+  const [dateMonth, setDateMonth] = useState('');
+  const [dateDay, setDateDay] = useState('');
+  const [timeHour, setTimeHour] = useState('');
+  const [timeMinute, setTimeMinute] = useState('');
+  const [timeAmPm, setTimeAmPm] = useState<'AM' | 'PM'>('AM');
+  const [durationHours, setDurationHours] = useState('');
+  const [durationMins, setDurationMins] = useState('0');
   const [location, setLocation] = useState('');
   const [recurring, setRecurring] = useState(false);
-  const [frequency, setFrequency] = useState('Weekly');
+  const [recurringDays, setRecurringDays] = useState<string[]>([]);
   const [numKids, setNumKids] = useState('');
   const [teensNeeded, setTeensNeeded] = useState(1);
   const [submitting, setSubmitting] = useState(false);
+
+  // Load existing job for editing
+  useEffect(() => {
+    if (!isEditing || !jobId) return;
+    supabase.from('jobs').select('*').eq('id', jobId).single().then(({ data }) => {
+      if (!data) return;
+      setTitle(data.title ?? '');
+      setCategory(data.category ?? '');
+      setDescription(data.description ?? '');
+      setPayAmount(data.pay_rate != null ? String(data.pay_rate) : '');
+      setPayType(data.pay_type === 'hourly' ? 'hr' : 'flat');
+      setLocation(data.location_area ?? '');
+      if (data.estimated_hours != null) {
+        const totalMins = Math.round(data.estimated_hours * 60);
+        setDurationHours(String(Math.floor(totalMins / 60)));
+        setDurationMins(String(totalMins % 60));
+      }
+      setRecurring(data.is_recurring ?? false);
+      setRecurringDays(data.recurring_days ?? []);
+      setTeensNeeded(data.teens_needed ?? 1);
+      setNumKids(data.kids_count != null ? String(data.kids_count) : '');
+      if (data.date) {
+        const parts = data.date.split('-');
+        if (parts.length === 3) { setDateMonth(parts[1]); setDateDay(parts[2]); }
+      }
+    });
+  }, [isEditing, jobId]);
+
+  const toggleDay = (day: string) => {
+    setRecurringDays((prev) => prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]);
+  };
 
   const submit = async () => {
     if (!title.trim() || !category || !payAmount) {
@@ -39,26 +85,51 @@ export default function PostJob() {
     if (!user) return;
     setSubmitting(true);
     try {
-      const { data, error } = await supabase.from('jobs').insert({
-        parent_id: user.id,
+      const isoDate = (dateMonth && dateDay)
+        ? `${new Date().getFullYear()}-${dateMonth.padStart(2, '0')}-${dateDay.padStart(2, '0')}`
+        : null;
+      let timeStr: string | null = null;
+      if (timeHour && timeMinute) {
+        const h = parseInt(timeHour, 10);
+        const hour24 = timeAmPm === 'PM' ? (h === 12 ? 12 : h + 12) : (h === 12 ? 0 : h);
+        timeStr = `${String(hour24).padStart(2, '0')}:${timeMinute.padStart(2, '0')}`;
+      }
+
+      const payload = {
         title: title.trim(),
         category,
         description: description.trim(),
         pay_rate: parseFloat(payAmount),
         pay_type: payType === 'hr' ? 'hourly' : 'flat',
         location_area: location.trim() || null,
-        date: date + (startTime ? ` ${startTime}` : '') || null,
-        estimated_hours: hours ? parseFloat(hours) : null,
+        date: isoDate,
+        start_time: timeStr,
+        estimated_hours: durationHours ? (parseInt(durationHours, 10) + parseInt(durationMins, 10) / 60) : null,
         is_recurring: recurring,
-        frequency: recurring ? frequency : null,
+        recurring_days: recurring && recurringDays.length > 0 ? recurringDays : null,
         kids_count: category === 'Babysitting' && numKids ? parseInt(numKids, 10) : null,
         teens_needed: teensNeeded,
-        status: 'open',
-        created_at: new Date().toISOString(),
-      }).select().single();
-      if (error) throw error;
-      Alert.alert('Posted!', 'Your job is now live.');
-      router.back();
+      };
+
+      if (isEditing && jobId) {
+        const { error } = await supabase.from('jobs').update(payload).eq('id', jobId);
+        if (error) throw error;
+        Alert.alert('Job Updated!', 'Your changes have been saved.', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      } else {
+        const { data, error } = await supabase.from('jobs').insert({
+          ...payload,
+          parent_id: user.id,
+          status: 'open',
+          created_at: new Date().toISOString(),
+        }).select().single();
+        if (error) throw error;
+        if (data) trackJobPosted(data.id, category, parseFloat(payAmount), payType === 'hr' ? 'hourly' : 'flat');
+        Alert.alert('Job Posted!', 'Teens near you can now see it.', [
+          { text: 'OK', onPress: () => router.replace('/(tabs)' as any) },
+        ]);
+      }
     } catch (e: any) {
       Alert.alert('Error', e.message);
     } finally {
@@ -80,10 +151,10 @@ export default function PostJob() {
         {/* Headline */}
         <View style={{ paddingHorizontal: 24, marginBottom: 36 }}>
           <Text style={{ fontFamily: ds.f.serifBold, fontSize: 42, color: ds.c.primary, lineHeight: 48, letterSpacing: -0.5, marginBottom: 10 }}>
-            Post a Job.
+            {isEditing ? 'Edit Job.' : 'Post a Job.'}
           </Text>
           <Text style={{ fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurfaceVariant, lineHeight: 22 }}>
-            Describe it and teens in your area will apply.
+            {isEditing ? 'Update the details below.' : 'Describe it and teens in your area will apply.'}
           </Text>
         </View>
 
@@ -172,48 +243,106 @@ export default function PostJob() {
             ))}
           </View>
 
-          {/* Date + Time */}
-          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 8 }}>Date</Text>
-              <View style={{ ...dsField }}>
-                <Ionicons name="calendar-outline" size={16} color={ds.c.onSurfaceVariant} />
-                <TextInput
-                  style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurface }}
-                  placeholder="Apr 12"
-                  placeholderTextColor={ds.c.outlineVariant}
-                  value={date}
-                  onChangeText={setDate}
-                />
-              </View>
+          {/* Date */}
+          <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 8 }}>Date <Text style={{ fontFamily: ds.f.sans, textTransform: 'none', letterSpacing: 0, fontSize: 11, color: ds.c.outlineVariant }}>(optional)</Text></Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 24 }}>
+            <View style={{ ...dsField, flex: 1 }}>
+              <TextInput
+                style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurface, textAlign: 'center' }}
+                placeholder="MM"
+                placeholderTextColor={ds.c.outlineVariant}
+                value={dateMonth}
+                onChangeText={(t) => setDateMonth(t.replace(/\D/g, '').slice(0, 2))}
+                keyboardType="number-pad"
+                maxLength={2}
+              />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 8 }}>Start Time</Text>
-              <View style={{ ...dsField }}>
-                <Ionicons name="time-outline" size={16} color={ds.c.onSurfaceVariant} />
-                <TextInput
-                  style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurface }}
-                  placeholder="3:00pm"
-                  placeholderTextColor={ds.c.outlineVariant}
-                  value={startTime}
-                  onChangeText={setStartTime}
-                />
-              </View>
+            <Text style={{ fontFamily: ds.f.sansBold, fontSize: 18, color: ds.c.onSurfaceVariant }}>/</Text>
+            <View style={{ ...dsField, flex: 1 }}>
+              <TextInput
+                style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurface, textAlign: 'center' }}
+                placeholder="DD"
+                placeholderTextColor={ds.c.outlineVariant}
+                value={dateDay}
+                onChangeText={(t) => setDateDay(t.replace(/\D/g, '').slice(0, 2))}
+                keyboardType="number-pad"
+                maxLength={2}
+              />
             </View>
           </View>
 
-          {/* Hours */}
-          <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 8 }}>Estimated Hours</Text>
-          <View style={{ ...dsField, marginBottom: 24 }}>
-            <Ionicons name="hourglass-outline" size={18} color={ds.c.onSurfaceVariant} />
-            <TextInput
-              style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurface }}
-              placeholder="e.g. 2"
-              placeholderTextColor={ds.c.outlineVariant}
-              value={hours}
-              onChangeText={setHours}
-              keyboardType="number-pad"
-            />
+          {/* Start Time */}
+          <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 8 }}>Start Time <Text style={{ fontFamily: ds.f.sans, textTransform: 'none', letterSpacing: 0, fontSize: 11, color: ds.c.outlineVariant }}>(optional)</Text></Text>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginBottom: 8 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 11, color: ds.c.onSurfaceVariant, marginBottom: 6, textAlign: 'center' }}>Hour (1–12)</Text>
+              <View style={{ ...dsField }}>
+                <TextInput
+                  style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurface, textAlign: 'center' }}
+                  placeholder="e.g. 3"
+                  placeholderTextColor={ds.c.outlineVariant}
+                  value={timeHour}
+                  onChangeText={(t) => setTimeHour(t.replace(/\D/g, '').slice(0, 2))}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                />
+              </View>
+            </View>
+            <Text style={{ fontFamily: ds.f.sansBold, fontSize: 22, color: ds.c.onSurfaceVariant, paddingBottom: 14 }}>:</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 11, color: ds.c.onSurfaceVariant, marginBottom: 6, textAlign: 'center' }}>Minutes</Text>
+              <View style={{ ...dsField }}>
+                <TextInput
+                  style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurface, textAlign: 'center' }}
+                  placeholder="00"
+                  placeholderTextColor={ds.c.outlineVariant}
+                  value={timeMinute}
+                  onChangeText={(t) => setTimeMinute(t.replace(/\D/g, '').slice(0, 2))}
+                  keyboardType="number-pad"
+                  maxLength={2}
+                />
+              </View>
+            </View>
+            <TouchableOpacity
+              style={{ paddingHorizontal: 18, paddingVertical: 14, borderRadius: 9999, backgroundColor: ds.c.primary }}
+              onPress={() => setTimeAmPm(timeAmPm === 'AM' ? 'PM' : 'AM')}
+            >
+              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: ds.c.white }}>{timeAmPm}</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.outlineVariant, marginBottom: 24 }}>Tap AM/PM to toggle</Text>
+
+          {/* Duration */}
+          <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 12 }}>Estimated Duration <Text style={{ fontFamily: ds.f.sans, textTransform: 'none', letterSpacing: 0, fontSize: 11, color: ds.c.outlineVariant }}>(optional)</Text></Text>
+          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 11, color: ds.c.onSurfaceVariant, marginBottom: 6 }}>Hours</Text>
+              <View style={{ ...dsField }}>
+                <Ionicons name="time-outline" size={16} color={ds.c.onSurfaceVariant} />
+                <TextInput
+                  style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurface }}
+                  placeholder="0"
+                  placeholderTextColor={ds.c.outlineVariant}
+                  value={durationHours}
+                  onChangeText={(t) => setDurationHours(t.replace(/\D/g, '').slice(0, 2))}
+                  keyboardType="number-pad"
+                />
+              </View>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 11, color: ds.c.onSurfaceVariant, marginBottom: 6 }}>Minutes</Text>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                {['0', '15', '30', '45'].map((m) => (
+                  <TouchableOpacity
+                    key={m}
+                    style={{ flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', backgroundColor: durationMins === m ? ds.c.primary : ds.c.surfaceContainerHigh }}
+                    onPress={() => setDurationMins(m)}
+                  >
+                    <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 12, color: durationMins === m ? ds.c.white : ds.c.onSurfaceVariant }}>{m}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
           </View>
 
           {/* Location */}
@@ -233,7 +362,7 @@ export default function PostJob() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: recurring ? 16 : 24, backgroundColor: ds.c.surfaceContainerHigh, borderRadius: 16, padding: 16 }}>
             <View>
               <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: ds.c.onSurface }}>Recurring job</Text>
-              <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant, marginTop: 2 }}>Repeat on a schedule</Text>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant, marginTop: 2 }}>Repeat on selected days</Text>
             </View>
             <Switch
               value={recurring}
@@ -243,23 +372,26 @@ export default function PostJob() {
             />
           </View>
           {recurring && (
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 24 }}>
-              {FREQUENCIES.map((f) => (
-                <TouchableOpacity
-                  key={f}
-                  style={{
-                    flex: 1, paddingVertical: 10, borderRadius: 9999, alignItems: 'center',
-                    backgroundColor: frequency === f ? ds.c.primary : ds.c.surfaceContainerHigh,
-                    borderWidth: frequency === f ? 0 : 1,
-                    borderColor: ds.c.outlineVariant,
-                  }}
-                  onPress={() => setFrequency(f)}
-                >
-                  <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 12, color: frequency === f ? ds.c.white : ds.c.onSurfaceVariant }}>
-                    {f}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+            <View style={{ flexDirection: 'row', gap: 6, marginBottom: 24, flexWrap: 'wrap' }}>
+              {DAYS.map((d) => {
+                const on = recurringDays.includes(d.value);
+                return (
+                  <TouchableOpacity
+                    key={d.value}
+                    style={{
+                      paddingHorizontal: 14, paddingVertical: 9, borderRadius: 9999,
+                      backgroundColor: on ? ds.c.primary : ds.c.surfaceContainerHigh,
+                      borderWidth: on ? 0 : 1,
+                      borderColor: ds.c.outlineVariant,
+                    }}
+                    onPress={() => toggleDay(d.value)}
+                  >
+                    <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 12, color: on ? ds.c.white : ds.c.onSurfaceVariant }}>
+                      {d.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
 
@@ -301,7 +433,7 @@ export default function PostJob() {
             </TouchableOpacity>
           </View>
 
-          <GradientButton label="Post Job" onPress={submit} loading={submitting} fullWidth />
+          <GradientButton label={isEditing ? 'Save Changes' : 'Post Job'} onPress={submit} loading={submitting} fullWidth />
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

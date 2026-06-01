@@ -12,6 +12,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   ScrollView,
   Text,
@@ -28,20 +29,17 @@ const PAY_FILTERS = [
   { label: '$20+/hr', value: 20 },
 ];
 
-const CATEGORY_GRID = [
-  { label: 'Creative Arts', icon: 'color-palette-outline' as const },
-  { label: 'Home Help', icon: 'home-outline' as const },
-  { label: 'Tech Support', icon: 'laptop-outline' as const },
-  { label: 'Moving', icon: 'cube-outline' as const },
-];
 
 function getInitials(name: string): string {
   return (name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
 }
 
 function formatDate(dateStr: string): string {
-  try { return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
-  catch { return dateStr; }
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch { return ''; }
 }
 
 // ─── Teen Home ────────────────────────────────────────────────────────────────
@@ -132,7 +130,7 @@ function TeenHome() {
 
         {/* ── Header ── */}
         <View style={{ paddingHorizontal: 24, paddingTop: 60, marginBottom: 6, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Text style={{ fontFamily: ds.f.serifBold, fontSize: 14, color: ds.c.secondary, fontStyle: 'italic' }}>Good day, {firstName}</Text>
+          <Text style={{ fontFamily: ds.f.serifBold, fontSize: 14, color: ds.c.secondary }}>Good day, {firstName}</Text>
           <TouchableOpacity
             onPress={() => router.push('/notifications' as any)}
             style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: ds.c.surfaceContainerLow, justifyContent: 'center', alignItems: 'center' }}
@@ -145,7 +143,7 @@ function TeenHome() {
         </View>
 
         <Text style={{ fontFamily: ds.f.serifBold, fontSize: 34, color: ds.c.primary, lineHeight: 40, letterSpacing: -0.5, paddingHorizontal: 24, marginBottom: 16 }}>
-          What do you need{'\n'}help with?
+          Find work{'\n'}near you.
         </Text>
 
         {/* Beta feedback banner */}
@@ -185,43 +183,53 @@ function TeenHome() {
 
         {/* ── Bento action cards ── */}
         <View style={{ paddingHorizontal: 24, marginBottom: 24, gap: 12 }}>
-          {/* Primary card: Browse Available Teens */}
-          <PressableScale onPress={() => router.push('/teen-profile' as any)}>
+          {/* Primary card: My Jobs */}
+          <PressableScale onPress={() => router.push('/(tabs)/jobs' as any)}>
             <LinearGradient colors={ds.gradient} style={{ borderRadius: 24, padding: 24 }}>
-              <Text style={{ ...dsLabel, color: ds.c.secondaryContainer, marginBottom: 10 }}>Community</Text>
-              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 26, color: ds.c.white, lineHeight: 32, letterSpacing: -0.3, marginBottom: 6 }}>Browse Available Teens</Text>
-              <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: 'rgba(243,251,244,0.65)', marginBottom: 16 }}>Find trusted local help</Text>
+              <Text style={{ ...dsLabel, color: ds.c.secondaryContainer, marginBottom: 10 }}>Your Work</Text>
+              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 26, color: ds.c.white, lineHeight: 32, letterSpacing: -0.3, marginBottom: 6 }}>My Jobs</Text>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: 'rgba(243,251,244,0.65)', marginBottom: 16 }}>Track applied, active, and completed jobs</Text>
               <View style={{ alignSelf: 'flex-start', backgroundColor: ds.c.secondaryContainer, borderRadius: 9999, paddingHorizontal: 16, paddingVertical: 8 }}>
-                <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.primary }}>Explore Teens</Text>
+                <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.primary }}>View Jobs</Text>
               </View>
             </LinearGradient>
           </PressableScale>
 
-          {/* Secondary card: Browse Jobs */}
-          <PressableScale
-            style={{ backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-            onPress={() => {}}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 20, color: ds.c.primary, lineHeight: 26, letterSpacing: -0.2, marginBottom: 4 }}>Browse Jobs</Text>
-              <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant }}>Find work near you</Text>
-            </View>
-            <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: ds.c.secondaryContainer, justifyContent: 'center', alignItems: 'center' }}>
-              <Ionicons name="briefcase-outline" size={22} color={ds.c.primary} />
-            </View>
-          </PressableScale>
+          {/* Secondary cards row */}
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <PressableScale
+              style={{ flex: 1, backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 20 }}
+              onPress={() => router.push('/(tabs)/jobs' as any)}
+            >
+              <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: ds.c.secondaryContainer, justifyContent: 'center', alignItems: 'center', marginBottom: 10 }}>
+                <Ionicons name="briefcase-outline" size={20} color={ds.c.primary} />
+              </View>
+              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 16, color: ds.c.primary, lineHeight: 22, letterSpacing: -0.2 }}>My Applications</Text>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant, marginTop: 2 }}>Track applied & active</Text>
+            </PressableScale>
+            <PressableScale
+              style={{ flex: 1, backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 20 }}
+              onPress={() => router.push('/browse-jobs' as any)}
+            >
+              <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: ds.c.surfaceContainerHigh, justifyContent: 'center', alignItems: 'center', marginBottom: 10 }}>
+                <Ionicons name="search-outline" size={20} color={ds.c.onSurface} />
+              </View>
+              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 16, color: ds.c.primary, lineHeight: 22, letterSpacing: -0.2 }}>Browse Jobs</Text>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant, marginTop: 2 }}>All jobs with filters</Text>
+            </PressableScale>
+          </View>
         </View>
 
         {/* ── Top Categories ── */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, marginBottom: 14 }}>
           <Text style={{ fontFamily: ds.f.serifBold, fontSize: 22, color: ds.c.primary, letterSpacing: -0.3 }}>Top Categories</Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => setSelectedCategory('All')}>
             <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ds.c.secondary }}>See All</Text>
           </TouchableOpacity>
         </View>
 
         {/* Category chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, gap: 8 }} style={{ marginBottom: 16 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', paddingHorizontal: 24, gap: 8 }} style={{ marginBottom: 16 }}>
           {CATEGORIES.map((cat) => (
             <TouchableOpacity
               key={cat}
@@ -239,22 +247,6 @@ function TeenHome() {
             </TouchableOpacity>
           ))}
         </ScrollView>
-
-        {/* Category grid 2x2 */}
-        <View style={{ paddingHorizontal: 24, marginBottom: 28, flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-          {CATEGORY_GRID.map((item) => (
-            <TouchableOpacity
-              key={item.label}
-              style={{ width: '47.5%', backgroundColor: ds.c.surfaceContainerLow, borderRadius: 20, padding: 18 }}
-              onPress={() => setSelectedCategory(item.label)}
-            >
-              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: ds.c.surfaceContainerHigh, justifyContent: 'center', alignItems: 'center', marginBottom: 12 }}>
-                <Ionicons name={item.icon} size={20} color={ds.c.onSurfaceVariant} />
-              </View>
-              <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: ds.c.onSurface }}>{item.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
 
         {/* ── Jobs list ── */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, marginBottom: 16 }}>
@@ -395,92 +387,96 @@ function TeenHome() {
 function ParentHome() {
   const { user, profile } = useAuth();
   const router = useRouter();
-  const [jobs, setJobs] = useState<any[]>([]);
+  const [activeJobs, setActiveJobs] = useState<any[]>([]);
   const [applications, setApplications] = useState<any[]>([]);
-  const [services, setServices] = useState<ServiceCardData[]>([]);
-  const [allTeens, setAllTeens] = useState<any[]>([]);
-  const [loadingJobs, setLoadingJobs] = useState(true);
+  const [teenServices, setTeenServices] = useState<any[]>([]);
   const [loadingApps, setLoadingApps] = useState(true);
-  const [loadingServices, setLoadingServices] = useState(true);
+  const [invitedTeens, setInvitedTeens] = useState<Set<string>>(new Set());
   const [unreadCount, setUnreadCount] = useState(0);
 
   const firstName = profile?.full_name?.split(' ')[0] ?? 'there';
 
-  const fetchJobs = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     if (!user) return;
-    setLoadingJobs(true);
-    const { data, error } = await supabase.from('jobs').select('*').eq('parent_id', user.id).order('created_at', { ascending: false });
-    if (!error && data) setJobs(data);
-    setLoadingJobs(false);
-  }, [user]);
 
-  const fetchApplications = useCallback(async () => {
-    if (!user) return;
-    setLoadingApps(true);
-    const { data, error } = await supabase
-      .from('applications')
-      .select('*, teen:profiles!teen_id(id, full_name, age, skills, rating), job:jobs!job_id(id, title)')
-      .eq('parent_id', user.id)
-      .eq('status', 'pending');
-    if (!error && data) setApplications(data);
+    const [jobsRes, appsRes, servicesRes] = await Promise.all([
+      supabase.from('jobs').select('id, title, category, status').eq('parent_id', user.id).eq('status', 'open').order('created_at', { ascending: false }),
+      supabase.from('applications').select('*, teen:profiles!teen_id(*), job:jobs(*)').eq('parent_id', user.id).in('status', ['pending', 'invited']),
+      supabase.from('teen_services').select('id, title, category, hourly_rate, availability, teen:profiles!teen_id(id, full_name, age, neighborhood, rating, rating_count, jobs_completed)').eq('is_active', true).order('created_at', { ascending: false }).limit(6),
+    ]);
+
+    if (jobsRes.data) setActiveJobs(jobsRes.data);
+    if (appsRes.data) setApplications(appsRes.data);
+    if (servicesRes.data) setTeenServices(servicesRes.data);
     setLoadingApps(false);
   }, [user]);
 
-  const fetchServices = useCallback(async () => {
-    setLoadingServices(true);
-    const { data, error } = await supabase
-      .from('teen_services')
-      .select('id, title, category, hourly_rate, availability, travel_distance, teen:profiles!teen_id(id, full_name, age)')
-      .eq('is_active', true).order('created_at', { ascending: false }).limit(15);
-    if (!error && data) setServices(data as unknown as ServiceCardData[]);
-    setLoadingServices(false);
-  }, []);
-
-  const fetchAllTeens = useCallback(async () => {
-    const { data } = await supabase.from('profiles').select('id, full_name, age, skills, rating, rating_count').eq('role', 'teen').order('rating', { ascending: false }).limit(20);
-    if (data) setAllTeens(data);
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      fetchJobs();
-      fetchApplications();
-      fetchServices();
-      fetchAllTeens();
-      if (user) getUnreadCount(user.id).then(setUnreadCount);
-    }, [fetchJobs, fetchApplications, fetchServices, fetchAllTeens, user])
-  );
+  useFocusEffect(useCallback(() => {
+    setLoadingApps(true);
+    fetchData();
+    if (user) getUnreadCount(user.id).then(setUnreadCount);
+  }, [fetchData, user]));
 
   async function handleAccept(appId: string) {
     const app = applications.find((a) => a.id === appId);
     if (!app?.job?.id || !app?.teen_id || !user) return;
-    try {
-      await acceptApplication(appId, app.job.id, app.teen_id, user.id);
-      setApplications((prev) => prev.filter((a) => a.id !== appId));
-    } catch {}
+    const teenName = app.teen?.full_name ?? undefined;
+    const jobTitle = app.job?.title ?? undefined;
+    Alert.alert(
+      'Accept Application?',
+      `Accept ${teenName ?? 'this teen'} for "${jobTitle ?? 'this job'}"? Other applicants will be declined.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Accept',
+          onPress: async () => {
+            try {
+              await acceptApplication(appId, app.job_id ?? app.job?.id, app.teen_id, user.id, teenName, jobTitle);
+              fetchData();
+            } catch (e: any) {
+              Alert.alert('Error', e.message ?? 'Could not accept application.');
+            }
+          },
+        },
+      ]
+    );
   }
 
   async function handleDecline(appId: string) {
     const app = applications.find((a) => a.id === appId);
     if (!app?.teen_id) return;
     try {
-      await declineApplication(appId, app.teen_id);
+      await declineApplication(appId, app.teen_id, app.job?.title ?? undefined);
       setApplications((prev) => prev.filter((a) => a.id !== appId));
-    } catch {}
+    } catch (e: any) {
+      Alert.alert('Error', e.message ?? 'Could not decline application.');
+    }
   }
 
-  function statusLabel(status: string) {
-    if (status === 'open') return { label: 'Open', bg: ds.c.secondaryContainer, color: ds.c.primary };
-    if (status === 'in_progress') return { label: 'In Progress', bg: '#dbeafe', color: '#1d4ed8' };
-    return { label: 'Closed', bg: ds.c.surfaceContainerHigh, color: ds.c.onSurfaceVariant };
+  async function inviteTeen(teenId: string, jobId: string) {
+    if (!user) return;
+    // Check for existing application
+    const { data: existing } = await supabase.from('applications').select('id').eq('job_id', jobId).eq('teen_id', teenId).maybeSingle();
+    if (existing) { setInvitedTeens((p) => new Set([...p, `${teenId}-${jobId}`])); return; }
+    await supabase.from('applications').insert({ job_id: jobId, teen_id: teenId, parent_id: user.id, status: 'invited' });
+    await supabase.from('notifications').insert({ user_id: teenId, type: 'invite', title: 'Job Invite', body: 'A parent has invited you to a job!', data: { job_id: jobId } });
+    setInvitedTeens((p) => new Set([...p, `${teenId}-${jobId}`]));
   }
+
+  // Group pending applications by job
+  const pendingByJob = applications.reduce((acc: Record<string, any[]>, app) => {
+    const jid = app.job_id;
+    if (!acc[jid]) acc[jid] = [];
+    acc[jid].push(app);
+    return acc;
+  }, {});
 
   return (
     <ScrollView style={{ flex: 1, backgroundColor: ds.c.bg }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 }}>
 
       {/* Header */}
       <View style={{ paddingHorizontal: 24, paddingTop: 60, marginBottom: 6, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={{ fontFamily: ds.f.serifBold, fontSize: 14, color: ds.c.secondary, fontStyle: 'italic' }}>Good day, {firstName}</Text>
+        <Text style={{ fontFamily: ds.f.serifBold, fontSize: 14, color: ds.c.secondary }}>Good day, {firstName}</Text>
         <TouchableOpacity
           onPress={() => router.push('/notifications' as any)}
           style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: ds.c.surfaceContainerLow, justifyContent: 'center', alignItems: 'center' }}
@@ -492,7 +488,7 @@ function ParentHome() {
         </TouchableOpacity>
       </View>
       <Text style={{ fontFamily: ds.f.serifBold, fontSize: 34, color: ds.c.primary, lineHeight: 40, letterSpacing: -0.5, paddingHorizontal: 24, marginBottom: 16 }}>
-        What do you need{'\n'}help with?
+        Find local help{'\n'}you can trust.
       </Text>
 
       {/* Beta feedback banner */}
@@ -501,11 +497,11 @@ function ParentHome() {
         onPress={() => router.push('/feedback' as any)}
         activeOpacity={0.75}
       >
-        <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: ds.c.primary, letterSpacing: 1, backgroundColor: ds.c.primary, color: ds.c.secondaryContainer, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>BETA</Text>
+        <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, letterSpacing: 1, backgroundColor: ds.c.primary, color: ds.c.secondaryContainer, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>BETA</Text>
         <Text style={{ flex: 1, fontFamily: ds.f.sansMedium, fontSize: 13, color: ds.c.primary }}>Found a bug or have feedback? Tap here →</Text>
       </TouchableOpacity>
 
-      {/* Bento action cards */}
+      {/* Action cards */}
       <View style={{ paddingHorizontal: 24, marginBottom: 28, gap: 12 }}>
         <PressableScale onPress={() => router.push('/post-job' as any)}>
           <LinearGradient colors={ds.gradient} style={{ borderRadius: 24, padding: 24 }}>
@@ -520,11 +516,11 @@ function ParentHome() {
 
         <PressableScale
           style={{ backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}
-          onPress={() => {}}
+          onPress={() => router.push('/browse-teens' as any)}
         >
           <View style={{ flex: 1 }}>
-            <Text style={{ fontFamily: ds.f.serifBold, fontSize: 20, color: ds.c.primary, lineHeight: 26, letterSpacing: -0.2, marginBottom: 4 }}>Browse Available Teens</Text>
-            <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant }}>Find skilled help in your area</Text>
+            <Text style={{ fontFamily: ds.f.serifBold, fontSize: 20, color: ds.c.primary, lineHeight: 26, letterSpacing: -0.2, marginBottom: 4 }}>Browse All Teens</Text>
+            <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant }}>Search & filter by skill or area</Text>
           </View>
           <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: ds.c.secondaryContainer, justifyContent: 'center', alignItems: 'center' }}>
             <Ionicons name="people-outline" size={22} color={ds.c.primary} />
@@ -532,110 +528,210 @@ function ParentHome() {
         </PressableScale>
       </View>
 
-      {/* Available Teens */}
-      <View style={{ paddingHorizontal: 24, marginBottom: 6 }}>
-        <Text style={{ ...dsSecondaryLabel, marginBottom: 6 }}>Available Now</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <Text style={{ fontFamily: ds.f.serifBold, fontSize: 22, color: ds.c.primary, letterSpacing: -0.3 }}>Available Teens</Text>
-          {!loadingServices && services.length > 0 && (
-            <View style={{ backgroundColor: ds.c.secondaryContainer, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 3 }}>
-              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.primary }}>{services.length}</Text>
+      {/* ── Teens Offering Services ── */}
+      {teenServices.length > 0 && (
+        <View style={{ marginBottom: 28 }}>
+          <View style={{ paddingHorizontal: 24, marginBottom: 16 }}>
+            <Text style={{ ...dsSecondaryLabel, marginBottom: 6 }}>Available Now</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 22, color: ds.c.primary, letterSpacing: -0.3 }}>Teens Offering Services</Text>
+              <TouchableOpacity onPress={() => router.push('/browse-teens' as any)}>
+                <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ds.c.secondary }}>See all</Text>
+              </TouchableOpacity>
             </View>
-          )}
-        </View>
-      </View>
-      <Text style={{ fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurfaceVariant, paddingHorizontal: 24, marginBottom: 16, lineHeight: 20 }}>
-        Teens who've posted their availability
-      </Text>
-
-      {loadingServices ? (
-        <ActivityIndicator size="small" color={ds.c.secondary} style={{ marginBottom: 20 }} />
-      ) : services.length === 0 ? (
-        <View style={{ marginHorizontal: 24, backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 32, alignItems: 'center', marginBottom: 24 }}>
-          <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 14, color: ds.c.onSurfaceVariant, textAlign: 'center' }}>No teens have posted their availability yet.</Text>
-        </View>
-      ) : (
-        services.map((service) => (
-          <View key={service.id} style={{ marginHorizontal: 24, marginBottom: 12 }}>
-            <ServiceCard service={service} />
           </View>
-        ))
-      )}
-
-      {/* Browse All Teens */}
-      {allTeens.length > 0 && (
-        <View style={{ marginBottom: 28, marginTop: 8 }}>
-          <View style={{ paddingHorizontal: 24, marginBottom: 14 }}>
-            <Text style={{ ...dsSecondaryLabel, marginBottom: 6 }}>Community</Text>
-            <Text style={{ fontFamily: ds.f.serifBold, fontSize: 22, color: ds.c.primary, letterSpacing: -0.3 }}>Browse All Teens</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, gap: 12 }}>
-            {allTeens.map((teen) => (
-              <PressableScale
-                key={teen.id}
-                style={{ backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 18, width: 140, alignItems: 'center' }}
+          {teenServices.map((service) => {
+            const teen = service.teen as any;
+            if (!teen) return null;
+            return (
+              <TouchableOpacity
+                key={service.id}
+                style={{ marginHorizontal: 24, marginBottom: 12, backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 20 }}
+                activeOpacity={0.75}
                 onPress={() => router.push(`/teen-profile?id=${teen.id}` as any)}
               >
-                <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: ds.c.secondaryContainer, justifyContent: 'center', alignItems: 'center', marginBottom: 10 }}>
-                  <Text style={{ fontFamily: ds.f.sansBold, fontSize: 18, color: ds.c.primary }}>{getInitials(teen.full_name)}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                  <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: ds.c.secondaryContainer, justifyContent: 'center', alignItems: 'center' }}>
+                    <Text style={{ fontFamily: ds.f.sansBold, fontSize: 14, color: ds.c.primary }}>
+                      {(teen.full_name || 'U').split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontFamily: ds.f.sansBold, fontSize: 14, color: ds.c.onSurface }}>
+                      {teen.full_name}{teen.age ? `, ${teen.age}` : ''}
+                    </Text>
+                    {teen.neighborhood ? <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>{teen.neighborhood}</Text> : null}
+                  </View>
+                  {service.hourly_rate ? (
+                    <View style={{ backgroundColor: ds.c.secondaryContainer, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 4 }}>
+                      <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.primary }}>${service.hourly_rate}/hr</Text>
+                    </View>
+                  ) : null}
                 </View>
-                <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: ds.c.onSurface, textAlign: 'center', marginBottom: 2 }} numberOfLines={1}>{teen.full_name}</Text>
-                {teen.age ? <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant, marginBottom: 6 }}>Age {teen.age}</Text> : null}
-                {teen.rating_count > 0 ? (
-                  <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.secondary }}>{Number(teen.rating).toFixed(1)} ★</Text>
-                ) : null}
-              </PressableScale>
-            ))}
-          </ScrollView>
+                <Text style={{ fontFamily: ds.f.serifBold, fontSize: 16, color: ds.c.primary, letterSpacing: -0.2, marginBottom: 6 }}>{service.title}</Text>
+                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                  <View style={{ backgroundColor: ds.c.surfaceContainerHigh, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 4 }}>
+                    <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 12, color: ds.c.onSurfaceVariant }}>{service.category}</Text>
+                  </View>
+                  {teen.rating_count > 0 && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.secondary }}>★ {Number(teen.rating).toFixed(1)}</Text>
+                    </View>
+                  )}
+                  {(teen.jobs_completed ?? 0) > 0 && (
+                    <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>{teen.jobs_completed} jobs done</Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
 
-      {/* Recent Applications */}
-      {applications.length > 0 && (
-        <View style={{ marginBottom: 16 }}>
+      {/* ── My Active Jobs with applicants ── */}
+      {activeJobs.length > 0 && (
+        <View style={{ marginBottom: 28 }}>
           <View style={{ paddingHorizontal: 24, marginBottom: 16 }}>
-            <Text style={{ ...dsSecondaryLabel, marginBottom: 6 }}>Pending Review</Text>
-            <Text style={{ fontFamily: ds.f.serifBold, fontSize: 22, color: ds.c.primary, letterSpacing: -0.3 }}>Applications</Text>
+            <Text style={{ ...dsSecondaryLabel, marginBottom: 6 }}>Your Open Jobs</Text>
+            <Text style={{ fontFamily: ds.f.serifBold, fontSize: 22, color: ds.c.primary, letterSpacing: -0.3 }}>Active Listings</Text>
           </View>
-          {loadingApps ? (
-            <ActivityIndicator size="small" color={ds.c.secondary} />
-          ) : (
-            applications.map((app) => (
-              <View key={app.id} style={{ marginHorizontal: 24, marginBottom: 12, backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 20 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 14 }}>
-                  <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: ds.c.secondaryContainer, justifyContent: 'center', alignItems: 'center' }}>
-                    <Text style={{ fontFamily: ds.f.sansBold, fontSize: 16, color: ds.c.primary }}>{getInitials(app.teen?.full_name ?? 'U')}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: ds.f.sansBold, fontSize: 15, color: ds.c.onSurface }}>
-                      {app.teen?.full_name ?? 'Unknown'}{app.teen?.age ? `, ${app.teen.age}` : ''}
-                    </Text>
-                    <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant, marginTop: 2 }}>{app.job?.title ?? ''}</Text>
-                  </View>
-                  {app.teen?.rating ? <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ds.c.secondary }}>{Number(app.teen.rating).toFixed(1)} ★</Text> : null}
+          {activeJobs.map((job) => {
+            const jobApps = pendingByJob[job.id] ?? [];
+            return (
+              <View key={job.id} style={{ marginHorizontal: 24, marginBottom: 12, backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 20 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: jobApps.length > 0 ? 14 : 0 }}>
+                  <Text style={{ fontFamily: ds.f.serifBold, fontSize: 17, color: ds.c.primary, flex: 1, letterSpacing: -0.2 }}>{job.title}</Text>
+                  <TouchableOpacity
+                    style={{ backgroundColor: ds.c.primary, borderRadius: 9999, paddingHorizontal: 14, paddingVertical: 7 }}
+                    onPress={() => router.push(`/browse-teens?jobId=${job.id}&jobTitle=${encodeURIComponent(job.title)}` as any)}
+                  >
+                    <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.white }}>Invite Teen</Text>
+                  </TouchableOpacity>
                 </View>
-                {app.teen?.skills?.length > 0 && (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-                    {(app.teen.skills as string[]).slice(0, 4).map((skill: string, i: number) => (
-                      <View key={i} style={{ backgroundColor: ds.c.surfaceContainerHigh, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 4 }}>
-                        <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 12, color: ds.c.onSurfaceVariant }}>{skill}</Text>
+
+                {jobApps.length > 0 && (
+                  <View>
+                    <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 11, color: ds.c.onSurfaceVariant, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 10 }}>
+                      {jobApps.length} applicant{jobApps.length > 1 ? 's' : ''}
+                    </Text>
+                    {jobApps.map((app) => (
+                      <View key={app.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 1, borderTopColor: ds.c.surfaceContainerHigh }}>
+                        <TouchableOpacity style={{ flex: 1 }} onPress={() => router.push(`/teen-profile?id=${app.teen_id}` as any)}>
+                          <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: ds.c.onSurface }}>{app.teen?.full_name ?? 'Unknown'}</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                            {app.status === 'invited' && (
+                              <View style={{ backgroundColor: '#ede9fe', borderRadius: 9999, paddingHorizontal: 7, paddingVertical: 2 }}>
+                                <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 10, color: '#5b21b6' }}>Invited</Text>
+                              </View>
+                            )}
+                            {app.teen?.rating > 0 && (
+                              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: ds.c.secondary }}>{Number(app.teen.rating).toFixed(1)} ★</Text>
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          {app.status === 'invited' ? (
+                            <View style={{ borderRadius: 9999, paddingHorizontal: 12, paddingVertical: 7, backgroundColor: ds.c.surfaceContainerHigh, opacity: 0.7 }}>
+                              <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 12, color: ds.c.onSurfaceVariant }}>Awaiting teen</Text>
+                            </View>
+                          ) : (
+                            <>
+                              <TouchableOpacity
+                                style={{ borderWidth: 1, borderColor: ds.c.outlineVariant, borderRadius: 9999, paddingHorizontal: 12, paddingVertical: 7 }}
+                                onPress={() => handleDecline(app.id)}
+                              >
+                                <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 12, color: ds.c.onSurfaceVariant }}>Decline</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={{ backgroundColor: ds.c.primary, borderRadius: 9999, paddingHorizontal: 12, paddingVertical: 7 }}
+                                onPress={() => handleAccept(app.id)}
+                              >
+                                <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.white }}>Accept</Text>
+                              </TouchableOpacity>
+                            </>
+                          )}
+                        </View>
                       </View>
                     ))}
                   </View>
                 )}
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <TouchableOpacity style={{ flex: 1, height: 44, borderRadius: 9999, borderWidth: 1.5, borderColor: ds.c.outlineVariant, justifyContent: 'center', alignItems: 'center' }} onPress={() => handleDecline(app.id)}>
-                    <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: ds.c.onSurfaceVariant }}>Decline</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={{ flex: 1, height: 44, borderRadius: 9999, backgroundColor: ds.c.primary, justifyContent: 'center', alignItems: 'center' }} onPress={() => handleAccept(app.id)}>
-                    <Text style={{ fontFamily: ds.f.sansBold, fontSize: 14, color: ds.c.white }}>Accept</Text>
-                  </TouchableOpacity>
-                </View>
+
+                {jobApps.length === 0 && (
+                  <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.outlineVariant, marginTop: 10 }}>No applications yet</Text>
+                )}
               </View>
-            ))
-          )}
+            );
+          })}
         </View>
       )}
+
+      {/* ── Teens Who Applied ── */}
+      {(() => {
+        // Deduplicate by teen_id — only show teens who proactively applied (status = pending)
+        const appliedTeens = Object.values(
+          applications
+            .filter((a) => a.status === 'pending')
+            .reduce((acc: Record<string, any>, app) => {
+              if (!acc[app.teen_id]) acc[app.teen_id] = { ...app.teen, jobId: app.job_id, jobTitle: app.job?.title };
+              return acc;
+            }, {})
+        ) as any[];
+
+        return (
+          <View style={{ marginBottom: 28 }}>
+            <View style={{ paddingHorizontal: 24, marginBottom: 16 }}>
+              <Text style={{ ...dsSecondaryLabel, marginBottom: 6 }}>Interested in Your Jobs</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontFamily: ds.f.serifBold, fontSize: 22, color: ds.c.primary, letterSpacing: -0.3 }}>Teens Who Applied</Text>
+                <TouchableOpacity onPress={() => router.push('/browse-teens' as any)}>
+                  <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ds.c.secondary }}>Browse all</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {loadingApps ? (
+              <ActivityIndicator size="small" color={ds.c.secondary} style={{ marginBottom: 24 }} />
+            ) : appliedTeens.length === 0 ? (
+              <View style={{ marginHorizontal: 24, backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 28, alignItems: 'center', marginBottom: 24 }}>
+                <Ionicons name="people-outline" size={28} color={ds.c.outlineVariant} style={{ marginBottom: 8 }} />
+                <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 14, color: ds.c.onSurfaceVariant, textAlign: 'center' }}>No applications yet.{'\n'}Post a job or browse teens to invite.</Text>
+              </View>
+            ) : (
+              <View style={{ marginHorizontal: 24, marginBottom: 8 }}>
+                {appliedTeens.map((teen) => (
+                  <View key={teen.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: ds.c.surfaceContainerLow }}>
+                    <TouchableOpacity onPress={() => router.push(`/teen-profile?id=${teen.id}` as any)}>
+                      <View style={{ width: 46, height: 46, borderRadius: 23, backgroundColor: ds.c.secondaryContainer, justifyContent: 'center', alignItems: 'center', marginRight: 14 }}>
+                        <Text style={{ fontFamily: ds.f.sansBold, fontSize: 16, color: ds.c.primary }}>{getInitials(teen.full_name ?? 'U')}</Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={{ flex: 1 }} onPress={() => router.push(`/teen-profile?id=${teen.id}` as any)}>
+                      <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: ds.c.onSurface, marginBottom: 2 }}>{teen.full_name}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        {teen.neighborhood ? <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>{teen.neighborhood}</Text> : null}
+                        {teen.rating_count > 0 && (
+                          <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.secondary }}>{Number(teen.rating).toFixed(1)} ★</Text>
+                        )}
+                      </View>
+                      {teen.jobTitle && (
+                        <Text style={{ fontFamily: ds.f.sans, fontSize: 11, color: ds.c.onSurfaceVariant, marginTop: 2 }}>Applied: {teen.jobTitle}</Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={{ backgroundColor: ds.c.primary, borderRadius: 9999, paddingHorizontal: 14, paddingVertical: 8, marginLeft: 8 }}
+                      onPress={() => router.push(`/teen-profile?id=${teen.id}` as any)}
+                    >
+                      <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.white }}>View</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        );
+      })()}
     </ScrollView>
   );
 }

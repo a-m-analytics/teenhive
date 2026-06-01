@@ -1,3 +1,4 @@
+import { ds } from '@/lib/design';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -166,13 +167,14 @@ const s = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 24, paddingTop: 60, paddingBottom: 16,
   },
-  logo: { fontSize: 18, fontWeight: '700', fontStyle: 'italic', color: '#051b0e' },
+  logo: { fontFamily: ds.f.serifBold, fontSize: 20, color: '#051b0e' },
   hero: { paddingHorizontal: 24, marginBottom: 32, marginTop: 8 },
-  title: { fontSize: 40, fontWeight: '700', fontStyle: 'italic', color: '#051b0e', lineHeight: 46, letterSpacing: -0.5, marginBottom: 10 },
-  subtitle: { fontSize: 15, color: '#737972' },
+  title: { fontFamily: ds.f.serifBold, fontSize: 42, color: '#051b0e', lineHeight: 48, letterSpacing: -0.5, marginBottom: 10 },
+  subtitle: { fontFamily: ds.f.sans, fontSize: 15, color: '#737972', lineHeight: 22 },
   form: { paddingHorizontal: 24 },
-  label: { fontSize: 11, fontWeight: '700', color: '#434843', letterSpacing: 1.5, marginBottom: 8 },
+  label: { fontFamily: ds.f.sansBold, fontSize: 11, color: '#434843', letterSpacing: 1.5, marginBottom: 8 },
   input: {
+    fontFamily: ds.f.sans,
     backgroundColor: '#eef6ef', borderRadius: 12,
     paddingHorizontal: 16, paddingVertical: 16,
     fontSize: 16, color: '#161d19',
@@ -181,12 +183,12 @@ const s = StyleSheet.create({
     backgroundColor: '#051b0e', borderRadius: 100,
     paddingVertical: 18, alignItems: 'center', marginTop: 28,
   },
-  buttonText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 1 },
+  buttonText: { fontFamily: ds.f.sansBold, color: '#fff', fontSize: 15, letterSpacing: 1 },
   errorBox: { backgroundColor: '#fef2f2', borderRadius: 12, padding: 14, marginBottom: 20 },
-  errorText: { fontSize: 13, color: '#ef4444', fontWeight: '500' },
+  errorText: { fontFamily: ds.f.sansMedium, fontSize: 13, color: '#ef4444' },
   iconCircle: {
     width: 80, height: 80, borderRadius: 40,
     backgroundColor: '#eef6ef', justifyContent: 'center', alignItems: 'center', marginBottom: 24,
   },
-  iconText: { fontSize: 36, color: '#051b0e', fontWeight: '700' },
+  iconText: { fontFamily: ds.f.serifBold, fontSize: 36, color: '#051b0e' },
 });

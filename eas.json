@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 10.0.0"
+    "version": ">= 10.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -14,10 +15,20 @@
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "channel": "production",
+      "ios": {
+        "buildConfiguration": "Release"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "mayafluffball8@gmail.com",
+        "ascAppId": "6773394320",
+        "appleTeamId": "55528DS4TP"
+      }
+    }
   }
 }

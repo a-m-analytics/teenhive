@@ -6,7 +6,7 @@ import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 const SECTIONS = [
   {
     title: 'Who can use Teen Hive',
-    body: 'Teen Hive is for teens aged 13–17 and parents/guardians aged 18 and over. By creating an account, you confirm you meet these requirements and that the information you provide is accurate.',
+    body: 'Teen Hive is for users aged 13 and over and parents/guardians aged 18 and over. By creating an account, you confirm you meet these requirements and that the information you provide is accurate.',
   },
   {
     title: 'What Teen Hive is',

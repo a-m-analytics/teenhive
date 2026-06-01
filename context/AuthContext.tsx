@@ -19,6 +19,7 @@ export type Profile = {
   rating_count: number;
   is_verified: boolean;
   phone_verified: boolean;
+  avatar_url: string | null;
 };
 
 type SignUpData = {
@@ -133,9 +134,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // Clear state immediately so UI reacts at once, then sign out
     setUser(null);
     setProfile(null);
+    await supabase.auth.signOut();
   };
 
   return (
