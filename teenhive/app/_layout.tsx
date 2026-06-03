@@ -1,4 +1,5 @@
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import posthog from '@/lib/analytics';
 import { PostHogProvider } from 'posthog-react-native';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
@@ -37,8 +38,14 @@ function AuthGate() {
 
 function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
   useEffect(() => {
-    if (fontsLoaded) SplashScreen.hideAsync();
+    if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
   }, [fontsLoaded]);
+
+  // Fallback: hide splash after 5s even if fonts fail to load
+  useEffect(() => {
+    const timer = setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 5000);
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <>
@@ -62,10 +69,12 @@ export default function RootLayout() {
   });
 
   return (
-    <PostHogProvider client={posthog}>
-      <AuthProvider>
-        <RootLayoutNav fontsLoaded={fontsLoaded} />
-      </AuthProvider>
-    </PostHogProvider>
+    <ErrorBoundary>
+      <PostHogProvider client={posthog}>
+        <AuthProvider>
+          <RootLayoutNav fontsLoaded={fontsLoaded ?? false} />
+        </AuthProvider>
+      </PostHogProvider>
+    </ErrorBoundary>
   );
 }

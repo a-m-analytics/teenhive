@@ -9,10 +9,21 @@ export default function Index() {
 
   useEffect(() => {
     const check = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) { setDestination('/(tabs)'); return; }
-      const hasOnboarded = await AsyncStorage.getItem('hasOnboarded');
-      setDestination(hasOnboarded ? '/welcome' : '/onboarding');
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (session) { setDestination('/(tabs)'); return; }
+      } catch (e) {
+        console.warn('Session check failed:', e);
+      }
+
+      try {
+        const hasOnboarded = await AsyncStorage.getItem('hasOnboarded');
+        setDestination(hasOnboarded ? '/welcome' : '/onboarding');
+      } catch (e) {
+        console.warn('AsyncStorage check failed:', e);
+        setDestination('/welcome');
+      }
     };
     check();
   }, []);
@@ -21,7 +32,7 @@ export default function Index() {
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#051b0e' }}>
-      <ActivityIndicator size="large" color="#735c00" />
+      <ActivityIndicator size="large" color="#22c55e" />
     </View>
   );
 }
