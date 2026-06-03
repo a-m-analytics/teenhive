@@ -12,6 +12,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#051b0e"
     },
+    "jsEngine": "hermes",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
