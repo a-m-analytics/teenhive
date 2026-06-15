@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 type ParentProfile = {
   id: string;
@@ -46,6 +46,11 @@ export default function ParentProfileScreen() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [jobCount, setJobCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [reportModal, setReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+
+  const REPORT_REASONS = ['Inappropriate content', 'Spam or scam', 'Harassment', 'Underage user', 'Other'];
 
   useEffect(() => {
     if (!id) return;
@@ -74,6 +79,7 @@ export default function ParentProfileScreen() {
 
   const handleBlock = async () => {
     if (!user || !id) return;
+    setMenuVisible(false);
     Alert.alert('Block User', 'This user will no longer appear in your feed.', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -83,6 +89,14 @@ export default function ParentProfileScreen() {
         },
       },
     ]);
+  };
+
+  const submitReport = async () => {
+    if (!user || !id || !reportReason) return;
+    await supabase.from('reports').insert({ reporter_id: user.id, reported_id: id, reason: reportReason, content_type: 'user', content_id: id });
+    setReportModal(false);
+    setReportReason('');
+    Alert.alert('Thank you', 'We will review this within 24 hours.');
   };
 
   if (loading) {
@@ -115,7 +129,7 @@ export default function ParentProfileScreen() {
             </TouchableOpacity>
             {user?.id !== id && (
               <TouchableOpacity
-                onPress={handleBlock}
+                onPress={() => setMenuVisible(true)}
                 style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }}
               >
                 <Ionicons name="ellipsis-horizontal" size={18} color="rgba(243,251,244,0.7)" />
@@ -215,6 +229,47 @@ export default function ParentProfileScreen() {
           </View>
         </View>
       </ScrollView>
+      {/* 3-dot menu */}
+      <Modal visible={menuVisible} transparent animationType="fade">
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' }} onPress={() => setMenuVisible(false)}>
+          <View style={{ position: 'absolute', top: 80, right: 24, backgroundColor: ds.c.bg, borderRadius: 20, borderWidth: 1, borderColor: ds.c.outlineVariant, overflow: 'hidden', minWidth: 180 }}>
+            <TouchableOpacity style={{ paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: ds.c.outlineVariant }} onPress={() => { setMenuVisible(false); setReportModal(true); }}>
+              <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 14, color: ds.c.onSurface }}>Report User</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={{ paddingHorizontal: 20, paddingVertical: 16 }} onPress={handleBlock}>
+              <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 14, color: ds.c.error }}>Block User</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Report modal */}
+      <Modal visible={reportModal} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: ds.c.bg, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 28, paddingBottom: 52 }}>
+            <Text style={{ fontFamily: ds.f.serifBold, fontSize: 28, color: ds.c.primary, marginBottom: 20, letterSpacing: -0.3 }}>Report User</Text>
+            {REPORT_REASONS.map((r) => (
+              <TouchableOpacity
+                key={r}
+                style={{ padding: 14, borderRadius: 14, marginBottom: 8, backgroundColor: reportReason === r ? ds.c.primaryContainer : ds.c.surfaceContainerLow }}
+                onPress={() => setReportReason(r)}
+              >
+                <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: reportReason === r ? ds.c.white : ds.c.onSurface }}>{r}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={{ marginTop: 12, borderRadius: 9999, backgroundColor: reportReason ? ds.c.primary : ds.c.surfaceContainerHigh, paddingVertical: 16, alignItems: 'center' }}
+              onPress={submitReport}
+              disabled={!reportReason}
+            >
+              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 14, color: reportReason ? ds.c.white : ds.c.outlineVariant }}>Submit Report</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setReportModal(false)} style={{ marginTop: 4, alignItems: 'center', paddingVertical: 14 }}>
+              <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 14, color: ds.c.onSurfaceVariant }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

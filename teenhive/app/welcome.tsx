@@ -1,12 +1,14 @@
 import Logo from '@/components/Logo';
 import { ds } from '@/lib/design';
 import { useRouter } from 'expo-router';
-import { Dimensions, Text, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { Dimensions, Modal, Text, TouchableOpacity, View } from 'react-native';
 
 const { height } = Dimensions.get('window');
 
 export default function Welcome() {
   const router = useRouter();
+  const [browseModal, setBrowseModal] = useState(false);
 
   return (
     <View style={{ flex: 1, backgroundColor: ds.c.primary }}>
@@ -45,10 +47,7 @@ export default function Welcome() {
         {/* Role cards */}
         <View style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
           <TouchableOpacity
-            style={{
-              flex: 1, borderRadius: 24, padding: 22,
-              backgroundColor: ds.c.primaryContainer,
-            }}
+            style={{ flex: 1, borderRadius: 24, padding: 22, backgroundColor: ds.c.primaryContainer }}
             onPress={() => router.push({ pathname: '/signup', params: { role: 'teen' } } as any)}
             activeOpacity={0.7}
           >
@@ -61,10 +60,7 @@ export default function Welcome() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={{
-              flex: 1, borderRadius: 24, padding: 22,
-              backgroundColor: ds.c.secondaryContainer,
-            }}
+            style={{ flex: 1, borderRadius: 24, padding: 22, backgroundColor: ds.c.secondaryContainer }}
             onPress={() => router.push({ pathname: '/signup', params: { role: 'parent' } } as any)}
             activeOpacity={0.7}
           >
@@ -87,7 +83,57 @@ export default function Welcome() {
             <Text style={{ fontFamily: ds.f.sansBold, color: ds.c.secondary }}>Sign In</Text>
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => setBrowseModal(true)}
+          style={{ alignItems: 'center', paddingVertical: 14 }}
+          activeOpacity={0.7}
+        >
+          <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 13, color: ds.c.onSurfaceVariant }}>
+            Browse without an account →
+          </Text>
+        </TouchableOpacity>
       </View>
+
+      {/* Browse mode picker */}
+      <Modal visible={browseModal} transparent animationType="slide">
+        <TouchableOpacity
+          style={{ flex: 1 }}
+          activeOpacity={1}
+          onPress={() => setBrowseModal(false)}
+        >
+          <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: ds.c.bg, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 28, paddingBottom: 52 }}>
+            <Text style={{ fontFamily: ds.f.serifBold, fontSize: 28, color: ds.c.primary, marginBottom: 6, letterSpacing: -0.3 }}>
+              I'm looking for...
+            </Text>
+            <Text style={{ fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurfaceVariant, marginBottom: 24 }}>
+              Choose what to browse
+            </Text>
+
+            <TouchableOpacity
+              style={{ backgroundColor: ds.c.primaryContainer, borderRadius: 24, padding: 22, marginBottom: 12 }}
+              activeOpacity={0.8}
+              onPress={() => { setBrowseModal(false); router.push('/browse-guest?mode=jobs' as any); }}
+            >
+              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 24, color: ds.c.white, lineHeight: 30, marginBottom: 4 }}>Jobs near me</Text>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: 'rgba(243,251,244,0.6)' }}>Browse open local jobs</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={{ backgroundColor: ds.c.secondaryContainer, borderRadius: 24, padding: 22, marginBottom: 20 }}
+              activeOpacity={0.8}
+              onPress={() => { setBrowseModal(false); router.push('/browse-guest?mode=teens' as any); }}
+            >
+              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 24, color: ds.c.primary, lineHeight: 30, marginBottom: 4 }}>Teens to hire</Text>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: 'rgba(5,27,14,0.5)' }}>Browse teens offering services</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => setBrowseModal(false)} style={{ alignItems: 'center', paddingVertical: 10 }}>
+              <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 14, color: ds.c.onSurfaceVariant }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }

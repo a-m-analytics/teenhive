@@ -8,8 +8,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Modal, ScrollView,
-  Text, TextInput, TouchableOpacity, View,
+  ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Modal, Platform, ScrollView,
+  Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, View,
 } from 'react-native';
 
 type Teen = {
@@ -129,7 +129,7 @@ export default function TeenProfile() {
 
   return (
     <View style={{ flex: 1, backgroundColor: ds.c.bg }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: isParent ? 110 : 60 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingBottom: (isParent || !user) ? 110 : 60 }} showsVerticalScrollIndicator={false}>
 
         {/* Hero */}
         <LinearGradient colors={ds.gradient} style={{ paddingTop: 56, paddingHorizontal: 24, paddingBottom: 48 }}>
@@ -137,7 +137,7 @@ export default function TeenProfile() {
             <TouchableOpacity onPress={() => router.back()}>
               <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: 'rgba(243,251,244,0.7)' }}>← Back</Text>
             </TouchableOpacity>
-            {user?.id !== id && (
+            {user && user?.id !== id && (
               <TouchableOpacity onPress={() => setMenuVisible(true)} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }}>
                 <Ionicons name="ellipsis-horizontal" size={18} color="rgba(243,251,244,0.7)" />
               </TouchableOpacity>
@@ -235,6 +235,18 @@ export default function TeenProfile() {
         </View>
       )}
 
+      {/* Sign up CTA for guests */}
+      {!user && (
+        <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 24, paddingBottom: 36, paddingTop: 16, backgroundColor: ds.c.bg }}>
+          <TouchableOpacity
+            style={{ backgroundColor: ds.c.primary, borderRadius: 9999, paddingVertical: 18, alignItems: 'center' }}
+            onPress={() => router.push({ pathname: '/signup', params: { role: 'parent' } } as any)}
+          >
+            <Text style={{ fontFamily: ds.f.sansBold, fontSize: 15, color: ds.c.white, letterSpacing: 1 }}>Sign Up to Invite</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Invite Modal */}
       <Modal visible={inviteModal} transparent animationType="slide">
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}>
@@ -282,7 +294,8 @@ export default function TeenProfile() {
 
       {/* Report modal */}
       <Modal visible={reportModal} transparent animationType="slide">
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}>
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View style={{ backgroundColor: ds.c.bg, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 28, paddingBottom: 52 }}>
             <Text style={{ fontFamily: ds.f.serifBold, fontSize: 28, color: ds.c.primary, marginBottom: 20, letterSpacing: -0.3 }}>Report User</Text>
             <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 12 }}>Reason</Text>
@@ -307,6 +320,9 @@ export default function TeenProfile() {
                 value={reportDetails}
                 onChangeText={setReportDetails}
                 multiline
+                returnKeyType="done"
+                onSubmitEditing={Keyboard.dismiss}
+                blurOnSubmit
               />
             </View>
             <GradientButton label="Submit Report" onPress={submitReport} fullWidth />
@@ -314,7 +330,8 @@ export default function TeenProfile() {
               <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 14, color: ds.c.onSurfaceVariant }}>Cancel</Text>
             </TouchableOpacity>
           </View>
-        </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

@@ -58,12 +58,8 @@ const ChunkedSecureStore = {
   },
 };
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('Supabase environment variables are missing');
-}
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://aeuegnnwagxjaqnpouxu.supabase.co';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFldWVnbm53YWd4amFxbnBvdXh1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNzUxNDMsImV4cCI6MjA5MDc1MTE0M30.nMlM0TckGarOODNq-TIXGGom_8hUycL1Bk0a8CSiLSo';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

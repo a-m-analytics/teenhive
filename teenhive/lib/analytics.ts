@@ -1,10 +1,13 @@
 import { PostHog } from 'posthog-react-native';
 
-// Initialize PostHog — swap in your real project API key from posthog.com
-const posthog = new PostHog('phc_qVsg9AXx8pZ4cQ6tA2rmNk4pBsZNgsPNRgpb3kzhCKkP', {
-  host: 'https://us.i.posthog.com',
-  disabled: false, // set to __DEV__ to disable tracking during local development
-});
+let posthog: PostHog;
+try {
+  posthog = new PostHog('phc_qVsg9AXx8pZ4cQ6tA2rmNk4pBsZNgsPNRgpb3kzhCKkP', {
+    host: 'https://us.i.posthog.com',
+  });
+} catch (e) {
+  posthog = { capture: () => {}, identify: () => {} } as any;
+}
 
 export default posthog;
 

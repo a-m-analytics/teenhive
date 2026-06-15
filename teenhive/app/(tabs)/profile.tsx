@@ -81,11 +81,8 @@ export default function ProfileTab() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const { data: { user } } = await supabase.auth.getUser();
-              if (!user) return;
-              // Delete profile data first (cascades via RLS)
-              await supabase.from('profiles').delete().eq('id', user.id);
-              // Sign out and redirect
+              const { error } = await supabase.rpc('delete_user');
+              if (error) throw error;
               await signOut();
               router.replace('/welcome' as any);
             } catch (e: any) {
@@ -126,6 +123,7 @@ export default function ProfileTab() {
     ...(isTeen ? [{ label: 'Saved Jobs', icon: 'bookmark-outline' as const, onPress: () => router.push('/saved-jobs' as any) }] : []),
     ...(isTeen ? [] : [{ label: 'Browse Teens', icon: 'people-outline' as const, onPress: () => router.push('/browse-teens' as any) }]),
     { label: 'Invite a Friend', icon: 'share-outline' as const, onPress: handleInvite },
+    { label: 'Blocked Users', icon: 'ban-outline' as const, onPress: () => router.push('/blocked-users' as any) },
     { label: 'Help & Feedback', icon: 'chatbubble-outline' as const, onPress: () => router.push('/feedback' as any) },
     { label: 'Privacy Policy', icon: 'shield-outline' as const, onPress: () => router.push('/privacy' as any) },
     { label: 'Terms of Service', icon: 'document-text-outline' as const, onPress: () => router.push('/terms' as any) },

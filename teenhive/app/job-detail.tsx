@@ -42,6 +42,10 @@ export default function JobDetail() {
   const [applying, setApplying] = useState(false);
   const [applicants, setApplicants] = useState<any[]>([]);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [reportModal, setReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const REPORT_REASONS = ['Inappropriate content', 'Spam or scam', 'Harassment', 'Underage user', 'Other'];
 
   useEffect(() => {
     if (!id) return;
@@ -185,9 +189,16 @@ export default function JobDetail() {
 
         {/* Hero gradient */}
         <LinearGradient colors={ds.gradient} style={{ borderRadius: 0, paddingTop: 56, paddingHorizontal: 24, paddingBottom: 36 }}>
-          <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 28 }}>
-            <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: 'rgba(243,251,244,0.7)' }}>← Back</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 }}>
+            <TouchableOpacity onPress={() => router.back()}>
+              <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: 'rgba(243,251,244,0.7)' }}>← Back</Text>
+            </TouchableOpacity>
+            {user && user?.id !== job?.parent_id && (
+              <TouchableOpacity onPress={() => setMenuVisible(true)} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' }}>
+                <Ionicons name="ellipsis-horizontal" size={18} color="rgba(243,251,244,0.7)" />
+              </TouchableOpacity>
+            )}
+          </View>
 
           {/* Category label */}
           <View style={{ backgroundColor: ds.c.secondaryContainer, alignSelf: 'flex-start', borderRadius: 9999, paddingHorizontal: 12, paddingVertical: 5, marginBottom: 16 }}>
@@ -415,12 +426,64 @@ export default function JobDetail() {
                   </TouchableOpacity>
                 )}
               </View>
-            ) : (
+            ) : user ? (
               <GradientButton label="Apply for this Job" onPress={() => setModal(true)} fullWidth />
+            ) : (
+              <TouchableOpacity
+                style={{ backgroundColor: ds.c.primary, borderRadius: 9999, paddingVertical: 18, alignItems: 'center' }}
+                onPress={() => router.push({ pathname: '/signup', params: { role: 'teen' } } as any)}
+              >
+                <Text style={{ fontFamily: ds.f.sansBold, fontSize: 15, color: ds.c.white, letterSpacing: 1 }}>Sign Up to Apply</Text>
+              </TouchableOpacity>
             )
           )}
         </View>
       </ScrollView>
+
+      {/* Job report menu */}
+      <Modal visible={menuVisible} transparent animationType="fade">
+        <TouchableOpacity style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' }} onPress={() => setMenuVisible(false)}>
+          <View style={{ position: 'absolute', top: 80, right: 24, backgroundColor: ds.c.bg, borderRadius: 20, borderWidth: 1, borderColor: ds.c.outlineVariant, overflow: 'hidden', minWidth: 180 }}>
+            <TouchableOpacity style={{ paddingHorizontal: 20, paddingVertical: 16 }} onPress={() => { setMenuVisible(false); setReportModal(true); }}>
+              <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 14, color: ds.c.error }}>Report Job</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Report reason sheet */}
+      <Modal visible={reportModal} transparent animationType="slide">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: ds.c.bg, borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 28, paddingBottom: 52 }}>
+            <Text style={{ fontFamily: ds.f.serifBold, fontSize: 28, color: ds.c.primary, marginBottom: 20, letterSpacing: -0.3 }}>Report Job</Text>
+            {REPORT_REASONS.map((r) => (
+              <TouchableOpacity
+                key={r}
+                style={{ padding: 14, borderRadius: 14, marginBottom: 8, backgroundColor: reportReason === r ? ds.c.primaryContainer : ds.c.surfaceContainerLow }}
+                onPress={() => setReportReason(r)}
+              >
+                <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: reportReason === r ? ds.c.white : ds.c.onSurface }}>{r}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={{ marginTop: 12, borderRadius: 9999, backgroundColor: reportReason ? ds.c.primary : ds.c.surfaceContainerHigh, paddingVertical: 16, alignItems: 'center' }}
+              disabled={!reportReason}
+              onPress={async () => {
+                if (!user || !job || !reportReason) return;
+                await supabase.from('reports').insert({ reporter_id: user.id, reported_id: job.parent_id, reason: reportReason, content_type: 'job', content_id: job.id });
+                setReportModal(false);
+                setReportReason('');
+                Alert.alert('Thank you', 'We will review this within 24 hours.');
+              }}
+            >
+              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 14, color: reportReason ? ds.c.white : ds.c.outlineVariant }}>Submit Report</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setReportModal(false)} style={{ marginTop: 4, alignItems: 'center', paddingVertical: 14 }}>
+              <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 14, color: ds.c.onSurfaceVariant }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Apply sheet — teens only */}
       <Modal visible={modal && user?.id !== job?.parent_id} transparent animationType="slide" onRequestClose={() => { Keyboard.dismiss(); setModal(false); }}>

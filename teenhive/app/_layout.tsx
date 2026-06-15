@@ -1,3 +1,7 @@
+global.ErrorUtils?.setGlobalHandler((error: any, isFatal: boolean) => {
+  console.log('Global error caught:', error?.message, 'Fatal:', isFatal);
+});
+
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import posthog from '@/lib/analytics';
@@ -54,6 +58,7 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
         <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
         <Stack.Screen name="verify-email" />
         <Stack.Screen name="review-modal" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="browse-guest" />
       </Stack>
       <StatusBar style="dark" />
     </>

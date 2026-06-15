@@ -57,6 +57,7 @@ function TeenHome() {
   const [showFilter, setShowFilter] = useState(false);
   const [payFilterIdx, setPayFilterIdx] = useState(0);
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
 
   const firstName = profile?.full_name?.split(' ')[0] ?? 'there';
 
@@ -94,13 +95,20 @@ function TeenHome() {
     if (data) setSavedJobs(new Set(data.map((s) => s.job_id)));
   }, [user]);
 
+  const fetchBlocked = useCallback(async () => {
+    if (!user) return;
+    const { data } = await supabase.from('blocks').select('blocked_id').eq('blocker_id', user.id);
+    if (data) setBlockedIds(new Set(data.map((b: any) => b.blocked_id)));
+  }, [user]);
+
   useFocusEffect(
     useCallback(() => {
       fetchJobs('', 'All', null);
       fetchServices();
       fetchSaved();
+      fetchBlocked();
       if (user) getUnreadCount(user.id).then(setUnreadCount);
-    }, [fetchJobs, fetchServices, fetchSaved, user])
+    }, [fetchJobs, fetchServices, fetchSaved, fetchBlocked, user])
   );
 
   useEffect(() => {
@@ -123,6 +131,8 @@ function TeenHome() {
   }
 
   const hasActiveFilters = payFilterIdx !== 0;
+  const visibleJobs = jobs.filter((j: any) => !blockedIds.has(j.parent?.id));
+  const visibleServices = services.filter((s: any) => !blockedIds.has((s.teen as any)?.id));
 
   return (
     <View style={{ flex: 1, backgroundColor: ds.c.bg }}>
@@ -252,7 +262,7 @@ function TeenHome() {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, marginBottom: 16 }}>
           <Text style={{ fontFamily: ds.f.serifBold, fontSize: 22, color: ds.c.primary, letterSpacing: -0.3 }}>Jobs Near You</Text>
           {!loadingJobs && (
-            <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 13, color: ds.c.onSurfaceVariant }}>{jobs.length} found</Text>
+            <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 13, color: ds.c.onSurfaceVariant }}>{visibleJobs.length} found</Text>
           )}
         </View>
 
@@ -269,7 +279,7 @@ function TeenHome() {
 
         {loadingJobs ? (
           <ActivityIndicator size="large" color={ds.c.secondary} style={{ marginVertical: 32 }} />
-        ) : jobs.length === 0 ? (
+        ) : visibleJobs.length === 0 ? (
           <View style={{ alignItems: 'center', paddingHorizontal: 40, paddingVertical: 32 }}>
             <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 14, color: ds.c.onSurfaceVariant, textAlign: 'center', marginBottom: 16 }}>
               No jobs found. Try different filters or check back soon.
@@ -282,7 +292,7 @@ function TeenHome() {
             </TouchableOpacity>
           </View>
         ) : (
-          jobs.map((job) => (
+          visibleJobs.map((job) => (
             <PressableScale
               key={job.id}
               style={{ marginHorizontal: 24, marginBottom: 12, backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 20 }}
@@ -334,13 +344,13 @@ function TeenHome() {
         )}
 
         {/* ── Teens offering services ── */}
-        {!loadingServices && services.length > 0 && (
+        {!loadingServices && visibleServices.length > 0 && (
           <View style={{ marginTop: 8 }}>
             <View style={{ paddingHorizontal: 24, marginBottom: 16 }}>
               <Text style={{ ...dsSecondaryLabel, marginBottom: 6 }}>Community</Text>
               <Text style={{ fontFamily: ds.f.serifBold, fontSize: 22, color: ds.c.primary, letterSpacing: -0.3 }}>Teens Near You</Text>
             </View>
-            {services.map((service) => (
+            {visibleServices.map((service) => (
               <View key={service.id} style={{ marginHorizontal: 24, marginBottom: 12 }}>
                 <ServiceCard service={service} />
               </View>
@@ -392,6 +402,7 @@ function ParentHome() {
   const [teenServices, setTeenServices] = useState<any[]>([]);
   const [loadingApps, setLoadingApps] = useState(true);
   const [invitedTeens, setInvitedTeens] = useState<Set<string>>(new Set());
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [unreadCount, setUnreadCount] = useState(0);
 
   const firstName = profile?.full_name?.split(' ')[0] ?? 'there';
@@ -399,15 +410,17 @@ function ParentHome() {
   const fetchData = useCallback(async () => {
     if (!user) return;
 
-    const [jobsRes, appsRes, servicesRes] = await Promise.all([
+    const [jobsRes, appsRes, servicesRes, blocksRes] = await Promise.all([
       supabase.from('jobs').select('id, title, category, status').eq('parent_id', user.id).eq('status', 'open').order('created_at', { ascending: false }),
       supabase.from('applications').select('*, teen:profiles!teen_id(*), job:jobs(*)').eq('parent_id', user.id).in('status', ['pending', 'invited']),
       supabase.from('teen_services').select('id, title, category, hourly_rate, availability, teen:profiles!teen_id(id, full_name, age, neighborhood, rating, rating_count, jobs_completed)').eq('is_active', true).order('created_at', { ascending: false }).limit(6),
+      supabase.from('blocks').select('blocked_id').eq('blocker_id', user.id),
     ]);
 
     if (jobsRes.data) setActiveJobs(jobsRes.data);
     if (appsRes.data) setApplications(appsRes.data);
     if (servicesRes.data) setTeenServices(servicesRes.data);
+    if (blocksRes.data) setBlockedIds(new Set(blocksRes.data.map((b: any) => b.blocked_id)));
     setLoadingApps(false);
   }, [user]);
 
@@ -463,8 +476,11 @@ function ParentHome() {
     setInvitedTeens((p) => new Set([...p, `${teenId}-${jobId}`]));
   }
 
+  const visibleApplications = applications.filter((a: any) => !blockedIds.has(a.teen_id));
+  const visibleTeenServices = teenServices.filter((s: any) => !blockedIds.has((s.teen as any)?.id));
+
   // Group pending applications by job
-  const pendingByJob = applications.reduce((acc: Record<string, any[]>, app) => {
+  const pendingByJob = visibleApplications.reduce((acc: Record<string, any[]>, app) => {
     const jid = app.job_id;
     if (!acc[jid]) acc[jid] = [];
     acc[jid].push(app);
@@ -529,7 +545,7 @@ function ParentHome() {
       </View>
 
       {/* ── Teens Offering Services ── */}
-      {teenServices.length > 0 && (
+      {visibleTeenServices.length > 0 && (
         <View style={{ marginBottom: 28 }}>
           <View style={{ paddingHorizontal: 24, marginBottom: 16 }}>
             <Text style={{ ...dsSecondaryLabel, marginBottom: 6 }}>Available Now</Text>
@@ -540,7 +556,7 @@ function ParentHome() {
               </TouchableOpacity>
             </View>
           </View>
-          {teenServices.map((service) => {
+          {visibleTeenServices.map((service) => {
             const teen = service.teen as any;
             if (!teen) return null;
             return (
@@ -669,7 +685,7 @@ function ParentHome() {
       {(() => {
         // Deduplicate by teen_id — only show teens who proactively applied (status = pending)
         const appliedTeens = Object.values(
-          applications
+          visibleApplications
             .filter((a) => a.status === 'pending')
             .reduce((acc: Record<string, any>, app) => {
               if (!acc[app.teen_id]) acc[app.teen_id] = { ...app.teen, jobId: app.job_id, jobTitle: app.job?.title };

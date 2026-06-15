@@ -41,6 +41,8 @@ export default function Signup() {
   const [homeType, setHomeType]     = useState('');
   const [hasPets, setHasPets]       = useState<boolean | null>(null);
 
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+
   // Step 3
   const [agreed1, setAgreed1] = useState(false);
   const [agreed2, setAgreed2] = useState(false);
@@ -67,6 +69,10 @@ export default function Signup() {
         Alert.alert('Error', 'Password must be at least 8 characters.');
         return;
       }
+      if (!agreedToTerms) {
+        Alert.alert('Terms Required', 'Please agree to the Terms of Service and Privacy Policy to continue.');
+        return;
+      }
       setStep(2);
     } else if (step === 2) {
       const ageNum = parseInt(age, 10);
@@ -80,10 +86,6 @@ export default function Signup() {
       }
       if (!isTeen && ageNum < 18) {
         Alert.alert('Error', 'Parents must be 18 or older.');
-        return;
-      }
-      if (!neighborhood.trim()) {
-        Alert.alert('Missing info', 'Please enter your neighborhood.');
         return;
       }
       if (isTeen && skills.length === 0) {
@@ -264,6 +266,19 @@ export default function Signup() {
                 <Ionicons name={showConfirmPassword ? 'eye-off-outline' : 'eye-outline'} size={20} color="#737972" />
               </TouchableOpacity>
             </View>
+
+            {/* TOS agreement — required to proceed */}
+            <TouchableOpacity style={[s.checkRow, { marginTop: 24 }]} onPress={() => setAgreedToTerms(!agreedToTerms)}>
+              <View style={[s.checkbox, agreedToTerms && s.checkboxChecked]}>
+                {agreedToTerms && <Text style={s.checkmark}>✓</Text>}
+              </View>
+              <Text style={s.checkText}>
+                I agree to the{' '}
+                <Text style={{ fontFamily: ds.f.sansSemiBold, color: '#735c00' }} onPress={() => router.push('/terms' as any)}>Terms of Service</Text>
+                {' and '}
+                <Text style={{ fontFamily: ds.f.sansSemiBold, color: '#735c00' }} onPress={() => router.push('/privacy' as any)}>Privacy Policy</Text>
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -297,7 +312,7 @@ export default function Signup() {
             />
             {ageError ? <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 12, color: '#ef4444', marginTop: 6 }}>{ageError}</Text> : null}
 
-            <Text style={s.label}>NEIGHBORHOOD</Text>
+            <Text style={s.label}>NEIGHBORHOOD <Text style={{ fontFamily: ds.f.sans, color: '#9ca3af', textTransform: 'none', letterSpacing: 0 }}>(optional)</Text></Text>
             <TextInput
               style={s.input}
               value={neighborhood}
@@ -310,7 +325,7 @@ export default function Signup() {
               importantForAutofill="no"
               returnKeyType="next"
             />
-            <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#737972', marginTop: 6 }}>We use this to show you nearby jobs</Text>
+            <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#737972', marginTop: 6 }}>Helps us show you nearby jobs — you can add this later from Edit Profile</Text>
 
             <Text style={s.label}>{isTeen ? 'ABOUT YOU' : 'ABOUT YOUR FAMILY'} <Text style={{ fontFamily: ds.f.sans, color: '#9ca3af' }}>(optional)</Text></Text>
             <TextInput
@@ -481,9 +496,9 @@ export default function Signup() {
 
         {/* Button */}
         <TouchableOpacity
-          style={[s.button, (loading || (step === 3 && !allChecked)) && { opacity: 0.5 }]}
+          style={[s.button, (loading || (step === 3 && !allChecked) || (step === 1 && !agreedToTerms)) && { opacity: 0.5 }]}
           onPress={step < 3 ? handleNext : handleSignup}
-          disabled={loading || (step === 3 && !allChecked)}
+          disabled={loading || (step === 3 && !allChecked) || (step === 1 && !agreedToTerms)}
         >
           <Text style={s.buttonText}>
             {loading ? 'Creating account...' : step < 3 ? 'NEXT STEP' : 'CREATE ACCOUNT'}
