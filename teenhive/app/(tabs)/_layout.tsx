@@ -9,9 +9,7 @@ const tabBarStyle = {
   backgroundColor: '#ffffff',
   borderTopWidth: 1,
   borderTopColor: '#f0f0f0',
-  paddingBottom: 4,
-  paddingTop: 12,
-  height: 56,
+  paddingTop: 8,
 };
 
 const screenOptions = {
