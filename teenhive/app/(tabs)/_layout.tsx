@@ -6,10 +6,11 @@ import { Tabs } from 'expo-router';
 import { useEffect, useState } from 'react';
 
 const tabBarStyle = {
-  backgroundColor: '#ffffff',
+  backgroundColor: '#fafafa',
   borderTopWidth: 1,
-  borderTopColor: '#f0f0f0',
-  paddingTop: 8,
+  borderTopColor: '#ebebeb',
+  paddingTop: 4,
+  paddingBottom: 2,
 };
 
 const screenOptions = {
@@ -19,9 +20,9 @@ const screenOptions = {
   tabBarStyle,
   tabBarLabelStyle: {
     fontFamily: ds.f.sansSemiBold,
-    fontSize: 10,
-    letterSpacing: 0.3,
-    marginTop: 2,
+    fontSize: 9,
+    letterSpacing: 0.2,
+    marginTop: 1,
   },
 };
 
@@ -29,7 +30,7 @@ function TabIcon({ name, focused, focusedName }: { name: any; focused: boolean; 
   return (
     <Ionicons
       name={focused ? (focusedName ?? name) : name}
-      size={focused ? 24 : 22}
+      size={focused ? 22 : 20}
       color={focused ? ds.c.secondary : '#c0c0c0'}
     />
   );
