@@ -8,19 +8,9 @@ import { useEffect, useState } from 'react';
 const tabBarStyle = {
   backgroundColor: ds.c.primary,
   borderTopWidth: 0,
-  borderRadius: 26,
-  paddingBottom: 12,
+  paddingBottom: 8,
   paddingTop: 10,
-  height: 70,
-  position: 'absolute' as const,
-  bottom: 28,
-  left: 16,
-  right: 16,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 8 },
-  shadowOpacity: 0.22,
-  shadowRadius: 20,
-  elevation: 24,
+  height: 64,
 };
 
 const screenOptions = {
