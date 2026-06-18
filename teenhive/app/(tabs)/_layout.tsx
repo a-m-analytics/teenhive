@@ -6,17 +6,18 @@ import { Tabs } from 'expo-router';
 import { useEffect, useState } from 'react';
 
 const tabBarStyle = {
-  backgroundColor: ds.c.primary,
-  borderTopWidth: 0,
+  backgroundColor: '#ffffff',
+  borderTopWidth: 1,
+  borderTopColor: '#f0f0f0',
   paddingBottom: 8,
-  paddingTop: 10,
-  height: 64,
+  paddingTop: 8,
+  height: 56,
 };
 
 const screenOptions = {
   headerShown: false,
-  tabBarActiveTintColor: ds.c.secondaryContainer,
-  tabBarInactiveTintColor: 'rgba(243,251,244,0.35)',
+  tabBarActiveTintColor: ds.c.secondary,
+  tabBarInactiveTintColor: '#c0c0c0',
   tabBarStyle,
   tabBarLabelStyle: {
     fontFamily: ds.f.sansSemiBold,
@@ -31,7 +32,7 @@ function TabIcon({ name, focused, focusedName }: { name: any; focused: boolean; 
     <Ionicons
       name={focused ? (focusedName ?? name) : name}
       size={focused ? 24 : 22}
-      color={focused ? ds.c.secondaryContainer : 'rgba(243,251,244,0.35)'}
+      color={focused ? ds.c.secondary : '#c0c0c0'}
     />
   );
 }
