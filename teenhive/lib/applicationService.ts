@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { trackJobApplied, trackApplicationAccepted, trackInviteSent, trackJobCompleted } from './analytics';
+import { sendPushToUser } from './pushService';
 
 export const applyToJob = async (
   jobId: string,
@@ -28,15 +29,20 @@ export const applyToJob = async (
 
   trackJobApplied(jobId, teenId, parentId);
 
-  await supabase.from('notifications').insert({
-    user_id: parentId,
-    type: 'new_application',
-    title: 'New Application',
-    body: teenName && jobTitle
-      ? `${teenName} applied to your job "${jobTitle}"`
-      : 'A teen applied to your job',
-    data: { job_id: jobId, teen_id: teenId },
-  });
+  const applyBody = teenName && jobTitle
+    ? `${teenName} applied to your job "${jobTitle}"`
+    : 'A teen applied to your job';
+
+  await Promise.all([
+    supabase.from('notifications').insert({
+      user_id: parentId,
+      type: 'new_application',
+      title: 'New Application',
+      body: applyBody,
+      data: { job_id: jobId, teen_id: teenId },
+    }),
+    sendPushToUser(parentId, 'New Application', applyBody, { job_id: jobId, teen_id: teenId }),
+  ]);
 
   return data;
 };
@@ -84,29 +90,39 @@ export const acceptApplication = async (
     read: false,
   });
 
-  await supabase.from('notifications').insert({
-    user_id: teenId,
-    type: 'application_accepted',
-    title: 'Application Accepted!',
-    body: jobTitle
-      ? `Your application for "${jobTitle}" was accepted! Check your messages.`
-      : 'Your application was accepted! You can now chat with the parent.',
-    data: { job_id: jobId, parent_id: parentId },
-  });
+  const acceptBody = jobTitle
+    ? `Your application for "${jobTitle}" was accepted! Check your messages.`
+    : 'Your application was accepted! You can now chat with the parent.';
+
+  await Promise.all([
+    supabase.from('notifications').insert({
+      user_id: teenId,
+      type: 'application_accepted',
+      title: 'Application Accepted!',
+      body: acceptBody,
+      data: { job_id: jobId, parent_id: parentId },
+    }),
+    sendPushToUser(teenId, 'Application Accepted! 🎉', acceptBody, { job_id: jobId, parent_id: parentId }),
+  ]);
 };
 
 export const declineApplication = async (applicationId: string, teenId: string, jobTitle?: string) => {
   await supabase.from('applications').update({ status: 'declined' }).eq('id', applicationId);
 
-  await supabase.from('notifications').insert({
-    user_id: teenId,
-    type: 'application_declined',
-    title: 'Application Update',
-    body: jobTitle
-      ? `Update on your application for "${jobTitle}".`
-      : 'A parent has reviewed your application.',
-    data: {},
-  });
+  const declineBody = jobTitle
+    ? `Update on your application for "${jobTitle}".`
+    : 'A parent has reviewed your application.';
+
+  await Promise.all([
+    supabase.from('notifications').insert({
+      user_id: teenId,
+      type: 'application_declined',
+      title: 'Application Update',
+      body: declineBody,
+      data: {},
+    }),
+    sendPushToUser(teenId, 'Application Update', declineBody),
+  ]);
 };
 
 export const completeJob = async (jobId: string, applicationId: string, teenId: string) => {
@@ -121,12 +137,15 @@ export const completeJob = async (jobId: string, applicationId: string, teenId: 
     .update({ jobs_completed: ((p as any)?.jobs_completed ?? 0) + 1 })
     .eq('id', teenId);
 
-  await supabase.from('notifications').insert({
-    user_id: teenId,
-    type: 'job_completed',
-    title: 'Job Complete!',
-    body: 'Great work! The job has been marked complete.',
-    data: { job_id: jobId },
-  });
+  await Promise.all([
+    supabase.from('notifications').insert({
+      user_id: teenId,
+      type: 'job_completed',
+      title: 'Job Complete!',
+      body: 'Great work! The job has been marked complete.',
+      data: { job_id: jobId },
+    }),
+    sendPushToUser(teenId, 'Job Complete! ✅', 'Great work! The job has been marked complete.', { job_id: jobId }),
+  ]);
 };
 

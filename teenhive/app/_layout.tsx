@@ -5,11 +5,14 @@ global.ErrorUtils?.setGlobalHandler((error: any, isFatal: boolean) => {
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import posthog from '@/lib/analytics';
+import { registerForPushNotifications } from '@/lib/pushService';
+import { supabase } from '@/lib/supabase';
 import { PostHogProvider } from 'posthog-react-native';
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { Manrope_400Regular, Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold } from '@expo-google-fonts/manrope';
 import { Newsreader_400Regular_Italic, Newsreader_700Bold_Italic } from '@expo-google-fonts/newsreader';
 import { SpaceGrotesk_500Medium, SpaceGrotesk_600SemiBold, SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
+import * as Linking from 'expo-linking';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -31,11 +34,38 @@ function AuthGate() {
     const inTabs = segments[0] === '(tabs)';
 
     if (!user && inTabs) {
-      // Signed out while inside tabs — go to welcome page
       router.replace('/welcome');
     }
-    // Signed-in → tabs is handled by index.tsx which reads session directly
   }, [user, loading, segments]);
+
+  useEffect(() => {
+    if (user) registerForPushNotifications(user.id);
+  }, [user?.id]);
+
+  // Handle email verification deep links (teenhive://verify-email?code=... or #access_token=...)
+  useEffect(() => {
+    const handleUrl = async (url: string) => {
+      try {
+        if (url.includes('code=')) {
+          await supabase.auth.exchangeCodeForSession(url);
+        } else {
+          const hash = url.split('#')[1] ?? '';
+          const params = new URLSearchParams(hash);
+          const accessToken = params.get('access_token');
+          const refreshToken = params.get('refresh_token');
+          if (accessToken && refreshToken) {
+            await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+          }
+        }
+      } catch (e) {
+        console.warn('Auth deep link handling failed:', e);
+      }
+    };
+
+    Linking.getInitialURL().then(url => { if (url) handleUrl(url); });
+    const subscription = Linking.addEventListener('url', event => handleUrl(event.url));
+    return () => subscription.remove();
+  }, []);
 
   return null;
 }

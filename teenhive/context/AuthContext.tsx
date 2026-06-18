@@ -58,12 +58,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   async function fetchProfile(userId: string) {
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();
-      if (data) setProfile(data as Profile);
+      if (data) {
+        setProfile(data as Profile);
+      } else if (error?.code === 'PGRST116') {
+        // Profile row deleted but auth session still active — sign out cleanly
+        setProfile(null);
+        setUser(null);
+        await supabase.auth.signOut();
+      }
     } catch (e) {
       console.warn('fetchProfile error:', e);
     }

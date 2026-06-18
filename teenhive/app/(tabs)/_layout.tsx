@@ -4,47 +4,45 @@ import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
-
-const TAB_BAR_HEIGHT = 84;
 
 const tabBarStyle = {
-  backgroundColor: 'rgba(243, 251, 244, 0.96)',
+  backgroundColor: ds.c.primary,
   borderTopWidth: 0,
-  borderTopLeftRadius: 28,
-  borderTopRightRadius: 28,
-  paddingBottom: 24,
-  paddingTop: 12,
-  height: TAB_BAR_HEIGHT,
+  borderRadius: 26,
+  paddingBottom: 12,
+  paddingTop: 10,
+  height: 70,
   position: 'absolute' as const,
-  bottom: 0,
-  left: 0,
-  right: 0,
-  elevation: 12,
-  shadowColor: '#051b0e',
-  shadowOffset: { width: 0, height: -4 },
-  shadowOpacity: 0.08,
-  shadowRadius: 16,
+  bottom: 28,
+  left: 16,
+  right: 16,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.22,
+  shadowRadius: 20,
+  elevation: 24,
 };
 
 const screenOptions = {
   headerShown: false,
-  tabBarActiveTintColor: ds.c.secondary,
-  tabBarInactiveTintColor: 'rgba(5,27,14,0.45)',
+  tabBarActiveTintColor: ds.c.secondaryContainer,
+  tabBarInactiveTintColor: 'rgba(243,251,244,0.35)',
   tabBarStyle,
   tabBarLabelStyle: {
     fontFamily: ds.f.sansSemiBold,
     fontSize: 10,
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
     marginTop: 2,
   },
 };
 
 function TabIcon({ name, focused, focusedName }: { name: any; focused: boolean; focusedName?: any }) {
   return (
-    <View style={focused ? { backgroundColor: ds.c.secondaryContainer, borderRadius: 12, padding: 4 } : undefined}>
-      <Ionicons name={focused ? (focusedName ?? name) : name} size={22} color={focused ? ds.c.secondary : 'rgba(5,27,14,0.45)'} />
-    </View>
+    <Ionicons
+      name={focused ? (focusedName ?? name) : name}
+      size={focused ? 24 : 22}
+      color={focused ? ds.c.secondaryContainer : 'rgba(243,251,244,0.35)'}
+    />
   );
 }
 
@@ -56,7 +54,6 @@ export default function TabLayout() {
     if (!user || !profile) return;
     async function fetchBadge() {
       if (profile?.role === 'teen') {
-        // Count pending invites for teen
         const { count } = await supabase
           .from('applications')
           .select('id', { count: 'exact', head: true })
@@ -64,7 +61,6 @@ export default function TabLayout() {
           .eq('status', 'invited');
         setJobsBadge(count ?? 0);
       } else if (profile?.role === 'parent') {
-        // Count pending applications on parent's jobs
         const { data: jobs } = await supabase
           .from('jobs')
           .select('id')
