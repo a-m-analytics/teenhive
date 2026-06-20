@@ -153,7 +153,7 @@ function TeenHome() {
         </View>
 
         <Text style={{ fontFamily: ds.f.serifBold, fontSize: 34, color: ds.c.primary, lineHeight: 40, letterSpacing: -0.5, paddingHorizontal: 24, marginBottom: 16 }}>
-          Find work{'\n'}near you.
+          Find work{'\n'}near <Text style={{ color: ds.c.secondary }}>you.</Text>
         </Text>
 
         {/* Beta feedback banner */}
@@ -504,7 +504,7 @@ function ParentHome() {
         </TouchableOpacity>
       </View>
       <Text style={{ fontFamily: ds.f.serifBold, fontSize: 34, color: ds.c.primary, lineHeight: 40, letterSpacing: -0.5, paddingHorizontal: 24, marginBottom: 16 }}>
-        Find local help{'\n'}you can trust.
+        Find local help{'\n'}you can <Text style={{ color: ds.c.secondary }}>trust.</Text>
       </Text>
 
       {/* Beta feedback banner */}
