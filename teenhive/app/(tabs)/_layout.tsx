@@ -6,9 +6,9 @@ import { Tabs } from 'expo-router';
 import { useEffect, useState } from 'react';
 
 const tabBarStyle = {
-  backgroundColor: '#f5f0eb',
+  backgroundColor: '#ffffff',
   borderTopWidth: 1,
-  borderTopColor: '#e6e0d8',
+  borderTopColor: '#efefef',
   paddingTop: 6,
   paddingBottom: 0,
   marginBottom: -8,
