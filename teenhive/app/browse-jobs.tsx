@@ -35,7 +35,7 @@ export default function BrowseJobs() {
   const [showFilters, setShowFilters] = useState(false);
   const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
   const [neighborhood, setNeighborhood] = useState('All');
-  const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
+  const [neighborhoods, setNeighborhoods] = useState<{ name: string; count: number }[]>([]);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchJobs = useCallback(async (q: string, cat: string, pIdx: number, sort: SortVal) => {
@@ -68,11 +68,16 @@ export default function BrowseJobs() {
     const { data } = await supabase
       .from('profiles')
       .select('neighborhood')
-      .eq('role', 'parent')
       .not('neighborhood', 'is', null);
     if (data) {
-      const unique = ['All', ...Array.from(new Set(data.map((p: any) => p.neighborhood).filter(Boolean)))];
-      setNeighborhoods(unique);
+      const counts: Record<string, number> = {};
+      data.forEach((p: any) => {
+        if (p.neighborhood) counts[p.neighborhood] = (counts[p.neighborhood] ?? 0) + 1;
+      });
+      const sorted = Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, count]) => ({ name, count }));
+      setNeighborhoods(sorted);
     }
   }, []);
 
@@ -197,18 +202,26 @@ export default function BrowseJobs() {
           </View>
 
           {/* Neighbourhood */}
-          {neighborhoods.length > 1 && (
+          {neighborhoods.length > 0 && (
             <View>
               <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: ds.c.onSurfaceVariant, letterSpacing: 1.2, marginBottom: 8 }}>NEIGHBOURHOOD</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
+                <TouchableOpacity
+                  onPress={() => setNeighborhood('All')}
+                  style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9999, backgroundColor: neighborhood === 'All' ? ds.c.primaryContainer : ds.c.surfaceContainerLow, borderWidth: neighborhood === 'All' ? 0 : 1, borderColor: ds.c.outlineVariant }}
+                >
+                  <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: neighborhood === 'All' ? ds.c.white : ds.c.onSurfaceVariant }}>All areas</Text>
+                </TouchableOpacity>
                 {neighborhoods.map((n) => (
                   <TouchableOpacity
-                    key={n}
-                    onPress={() => setNeighborhood(n)}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9999, backgroundColor: neighborhood === n ? ds.c.primaryContainer : ds.c.surfaceContainerLow, borderWidth: neighborhood === n ? 0 : 1, borderColor: ds.c.outlineVariant }}
+                    key={n.name}
+                    onPress={() => setNeighborhood(n.name)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9999, backgroundColor: neighborhood === n.name ? ds.c.primaryContainer : ds.c.surfaceContainerLow, borderWidth: neighborhood === n.name ? 0 : 1, borderColor: ds.c.outlineVariant }}
                   >
-                    {n !== 'All' && <Ionicons name="location-outline" size={11} color={neighborhood === n ? ds.c.white : ds.c.onSurfaceVariant} />}
-                    <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: neighborhood === n ? ds.c.white : ds.c.onSurfaceVariant }}>{n}</Text>
+                    <Ionicons name="location-outline" size={11} color={neighborhood === n.name ? ds.c.white : ds.c.onSurfaceVariant} />
+                    <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: neighborhood === n.name ? ds.c.white : ds.c.onSurfaceVariant }}>
+                      {n.name} <Text style={{ opacity: 0.7 }}>({n.count})</Text>
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -239,16 +252,24 @@ export default function BrowseJobs() {
       )}
 
       {/* Neighbourhood chips quick-select */}
-      {!showFilters && neighborhoods.length > 1 && (
+      {!showFilters && neighborhoods.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }} contentContainerStyle={{ paddingHorizontal: 24, gap: 8, alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={() => setNeighborhood('All')}
+            style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9999, backgroundColor: neighborhood === 'All' ? ds.c.primary : ds.c.surfaceContainerLow, borderWidth: neighborhood === 'All' ? 0 : 1, borderColor: ds.c.outlineVariant }}
+          >
+            <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 12, color: neighborhood === 'All' ? ds.c.white : ds.c.onSurfaceVariant }}>All areas</Text>
+          </TouchableOpacity>
           {neighborhoods.map((n) => (
             <TouchableOpacity
-              key={n}
-              onPress={() => setNeighborhood(n)}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9999, backgroundColor: neighborhood === n ? ds.c.primary : ds.c.surfaceContainerLow, borderWidth: neighborhood === n ? 0 : 1, borderColor: ds.c.outlineVariant }}
+              key={n.name}
+              onPress={() => setNeighborhood(n.name)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9999, backgroundColor: neighborhood === n.name ? ds.c.primary : ds.c.surfaceContainerLow, borderWidth: neighborhood === n.name ? 0 : 1, borderColor: ds.c.outlineVariant }}
             >
-              {n !== 'All' && <Ionicons name="location-outline" size={11} color={neighborhood === n ? ds.c.white : ds.c.onSurfaceVariant} />}
-              <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 12, color: neighborhood === n ? ds.c.white : ds.c.onSurfaceVariant }}>{n}</Text>
+              <Ionicons name="location-outline" size={11} color={neighborhood === n.name ? ds.c.white : ds.c.onSurfaceVariant} />
+              <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 12, color: neighborhood === n.name ? ds.c.white : ds.c.onSurfaceVariant }}>
+                {n.name} <Text style={{ opacity: 0.7 }}>({n.count})</Text>
+              </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
