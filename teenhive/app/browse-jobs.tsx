@@ -34,13 +34,15 @@ export default function BrowseJobs() {
   const [sortBy, setSortBy] = useState<SortVal>('newest');
   const [showFilters, setShowFilters] = useState(false);
   const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
+  const [neighborhood, setNeighborhood] = useState('All');
+  const [neighborhoods, setNeighborhoods] = useState<string[]>([]);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchJobs = useCallback(async (q: string, cat: string, pIdx: number, sort: SortVal) => {
     setLoading(true);
     let query = supabase
       .from('jobs')
-      .select('*, parent:profiles!parent_id(id, full_name, is_verified)')
+      .select('*, parent:profiles!parent_id(id, full_name, is_verified, neighborhood)')
       .eq('status', 'open');
     if (cat !== 'All') query = query.eq('category', cat);
     if (q.trim()) query = query.ilike('title', `%${q.trim()}%`);
@@ -62,16 +64,33 @@ export default function BrowseJobs() {
     if (data) setSavedJobs(new Set(data.map((s: any) => s.job_id)));
   }, [user]);
 
+  const fetchNeighborhoods = useCallback(async () => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('neighborhood')
+      .eq('role', 'parent')
+      .not('neighborhood', 'is', null);
+    if (data) {
+      const unique = ['All', ...Array.from(new Set(data.map((p: any) => p.neighborhood).filter(Boolean)))];
+      setNeighborhoods(unique);
+    }
+  }, []);
+
   useEffect(() => {
     fetchSaved();
     fetchJobs('', 'All', 0, 'newest');
-  }, [fetchJobs, fetchSaved]);
+    fetchNeighborhoods();
+  }, [fetchJobs, fetchSaved, fetchNeighborhoods]);
 
   useEffect(() => {
     if (debounce.current) clearTimeout(debounce.current);
     debounce.current = setTimeout(() => fetchJobs(search, category, payIdx, sortBy), 350);
     return () => { if (debounce.current) clearTimeout(debounce.current); };
   }, [search, category, payIdx, sortBy, fetchJobs]);
+
+  const visibleJobs = neighborhood === 'All'
+    ? jobs
+    : jobs.filter((j) => j.parent?.neighborhood === neighborhood);
 
   async function toggleSave(jobId: string) {
     if (!user) return;
@@ -84,7 +103,7 @@ export default function BrowseJobs() {
     }
   }
 
-  const hasFilters = category !== 'All' || payIdx !== 0 || sortBy !== 'newest';
+  const hasFilters = category !== 'All' || payIdx !== 0 || sortBy !== 'newest' || neighborhood !== 'All';
 
   return (
     <View style={{ flex: 1, backgroundColor: ds.c.bg }}>
@@ -177,8 +196,27 @@ export default function BrowseJobs() {
             </View>
           </View>
 
+          {/* Neighbourhood */}
+          {neighborhoods.length > 1 && (
+            <View>
+              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: ds.c.onSurfaceVariant, letterSpacing: 1.2, marginBottom: 8 }}>NEIGHBOURHOOD</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, alignItems: 'center' }}>
+                {neighborhoods.map((n) => (
+                  <TouchableOpacity
+                    key={n}
+                    onPress={() => setNeighborhood(n)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9999, backgroundColor: neighborhood === n ? ds.c.primaryContainer : ds.c.surfaceContainerLow, borderWidth: neighborhood === n ? 0 : 1, borderColor: ds.c.outlineVariant }}
+                  >
+                    {n !== 'All' && <Ionicons name="location-outline" size={11} color={neighborhood === n ? ds.c.white : ds.c.onSurfaceVariant} />}
+                    <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: neighborhood === n ? ds.c.white : ds.c.onSurfaceVariant }}>{n}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
           {hasFilters && (
-            <TouchableOpacity onPress={() => { setCategory('All'); setPayIdx(0); setSortBy('newest'); }}>
+            <TouchableOpacity onPress={() => { setCategory('All'); setPayIdx(0); setSortBy('newest'); setNeighborhood('All'); }}>
               <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ds.c.secondary }}>Clear all filters</Text>
             </TouchableOpacity>
           )}
@@ -187,7 +225,7 @@ export default function BrowseJobs() {
 
       {/* Category chips quick-select */}
       {!showFilters && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, gap: 8, paddingBottom: 4 }} style={{ marginBottom: 12 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} contentContainerStyle={{ paddingHorizontal: 24, gap: 8, alignItems: 'center' }}>
           {CATEGORIES.map((c) => (
             <TouchableOpacity
               key={c}
@@ -200,20 +238,36 @@ export default function BrowseJobs() {
         </ScrollView>
       )}
 
+      {/* Neighbourhood chips quick-select */}
+      {!showFilters && neighborhoods.length > 1 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }} contentContainerStyle={{ paddingHorizontal: 24, gap: 8, alignItems: 'center' }}>
+          {neighborhoods.map((n) => (
+            <TouchableOpacity
+              key={n}
+              onPress={() => setNeighborhood(n)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9999, backgroundColor: neighborhood === n ? ds.c.primary : ds.c.surfaceContainerLow, borderWidth: neighborhood === n ? 0 : 1, borderColor: ds.c.outlineVariant }}
+            >
+              {n !== 'All' && <Ionicons name="location-outline" size={11} color={neighborhood === n ? ds.c.white : ds.c.onSurfaceVariant} />}
+              <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 12, color: neighborhood === n ? ds.c.white : ds.c.onSurfaceVariant }}>{n}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+
       {/* Result count */}
       {!loading && (
         <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 13, color: ds.c.onSurfaceVariant, paddingHorizontal: 24, marginBottom: 10 }}>
-          {jobs.length} {jobs.length === 1 ? 'job' : 'jobs'} found
+          {visibleJobs.length} {visibleJobs.length === 1 ? 'job' : 'jobs'} found
         </Text>
       )}
 
       {loading ? (
         <ActivityIndicator size="large" color={ds.c.secondary} style={{ marginTop: 40 }} />
-      ) : jobs.length === 0 ? (
+      ) : visibleJobs.length === 0 ? (
         <EmptyState icon="briefcase-outline" title="No jobs match" subtitle="Try different filters" />
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 120 }}>
-          {jobs.map((job) => {
+          {visibleJobs.map((job) => {
             const pay = `$${job.pay_rate}${job.pay_type === 'hourly' ? '/hr' : ' flat'}`;
             const isSaved = savedJobs.has(job.id);
             return (
