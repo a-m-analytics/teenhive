@@ -166,30 +166,6 @@ function TeenHome() {
           <Text style={{ flex: 1, fontFamily: ds.f.sansMedium, fontSize: 13, color: ds.c.primary }}>Found a bug or have feedback? Tap here →</Text>
         </TouchableOpacity>
 
-        {/* ── Search bar ── */}
-        <View style={{ marginHorizontal: 24, marginBottom: 20, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: ds.c.surfaceContainerLow, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 13, gap: 10 }}>
-            <Ionicons name="search-outline" size={16} color={ds.c.onSurfaceVariant} />
-            <TextInput
-              style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurface }}
-              placeholder="Search jobs..."
-              placeholderTextColor={ds.c.outlineVariant}
-              value={searchText}
-              onChangeText={setSearchText}
-            />
-            {searchText.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchText('')}>
-                <Ionicons name="close-circle" size={15} color={ds.c.outlineVariant} />
-              </TouchableOpacity>
-            )}
-          </View>
-          <TouchableOpacity
-            style={{ width: 46, height: 46, borderRadius: 14, backgroundColor: hasActiveFilters ? ds.c.secondary : ds.c.surfaceContainerHigh, justifyContent: 'center', alignItems: 'center' }}
-            onPress={() => setShowFilter(true)}
-          >
-            <Ionicons name="options-outline" size={18} color={hasActiveFilters ? ds.c.white : ds.c.onSurface} />
-          </TouchableOpacity>
-        </View>
 
         {/* ── Bento action cards ── */}
         <View style={{ paddingHorizontal: 24, marginBottom: 24, gap: 12 }}>
