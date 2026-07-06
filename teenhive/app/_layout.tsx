@@ -24,7 +24,7 @@ SplashScreen.preventAutoHideAsync();
 // Handles all auth-based redirects in one place.
 // Runs at the root so it only fires once regardless of which screen is mounted.
 function AuthGate() {
-  const { user, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
@@ -32,11 +32,24 @@ function AuthGate() {
     if (loading) return;
 
     const inTabs = segments[0] === '(tabs)';
+    const onPendingScreen = segments[0] === 'verification-pending';
 
     if (!user && inTabs) {
       router.replace('/welcome');
+      return;
     }
-  }, [user, loading, segments]);
+
+    // Block unverified teens from tabs
+    if (user && profile?.role === 'teen' && profile?.verification_status === 'pending') {
+      if (inTabs) router.replace('/verification-pending');
+      return;
+    }
+
+    // Verified teen or parent on pending screen — push them to tabs
+    if (user && onPendingScreen && profile?.verification_status !== 'pending') {
+      router.replace('/(tabs)');
+    }
+  }, [user, profile, loading, segments]);
 
   useEffect(() => {
     if (user) registerForPushNotifications(user.id);
@@ -88,6 +101,7 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
         <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
         <Stack.Screen name="verify-email" />
         <Stack.Screen name="how-it-works" />
+        <Stack.Screen name="verification-pending" />
         <Stack.Screen name="review-modal" options={{ presentation: 'modal' }} />
         <Stack.Screen name="browse-guest" />
       </Stack>

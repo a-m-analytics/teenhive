@@ -33,6 +33,9 @@ export default function Signup() {
   const [age, setAge]               = useState('');
   const [neighborhood, setNeighborhood] = useState('');
   const [bio, setBio]               = useState('');
+  const [phone, setPhone]           = useState('');
+  const [refName, setRefName]       = useState('');
+  const [refContact, setRefContact] = useState('');
   const [hourlyRate, setHourlyRate] = useState('');
   const [numberOfKids, setNumberOfKids] = useState('');
   const [skills, setSkills]         = useState<string[]>([]);
@@ -88,6 +91,22 @@ export default function Signup() {
         Alert.alert('Error', 'Parents must be 18 or older.');
         return;
       }
+      if (isTeen && !bio.trim()) {
+        Alert.alert('Missing info', 'Please write a short bio so parents know who you are.');
+        return;
+      }
+      if (isTeen && !phone.trim()) {
+        Alert.alert('Missing info', 'Please enter your phone number so we can reach you for the verification call.');
+        return;
+      }
+      if (isTeen && !refName.trim()) {
+        Alert.alert('Missing info', 'Please add a reference — someone who can vouch for you.');
+        return;
+      }
+      if (isTeen && !refContact.trim()) {
+        Alert.alert('Missing info', 'Please add your reference\'s email or phone number.');
+        return;
+      }
       if (isTeen && skills.length === 0) {
         Alert.alert('Missing info', 'Please select at least one skill.');
         return;
@@ -133,6 +152,10 @@ export default function Signup() {
         hourly_rate_val: isTeen && hourlyRate ? parseFloat(hourlyRate) : null,
         skills_val: isTeen ? skills : [],
         availability_val: isTeen ? avail : [],
+        phone_val: isTeen ? phone.trim() : null,
+        reference_name_val: isTeen ? refName.trim() : null,
+        reference_contact_val: isTeen ? refContact.trim() : null,
+        verification_status_val: isTeen ? 'pending' : 'verified',
       });
 
       // Always show how-it-works first; it then routes to verify-email or tabs
@@ -311,36 +334,81 @@ export default function Signup() {
             />
             {ageError ? <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 12, color: '#ef4444', marginTop: 6 }}>{ageError}</Text> : null}
 
-            <Text style={s.label}>NEIGHBORHOOD <Text style={{ fontFamily: ds.f.sans, color: '#9ca3af', textTransform: 'none', letterSpacing: 0 }}>(optional)</Text></Text>
+            <Text style={s.label}>NEIGHBOURHOOD <Text style={{ fontFamily: ds.f.sans, color: '#9ca3af', textTransform: 'none', letterSpacing: 0 }}>(optional)</Text></Text>
             <TextInput
               style={s.input}
               value={neighborhood}
               onChangeText={(t) => setNeighborhood(t)}
-              placeholder="e.g. Maplewood, NJ"
+              placeholder="e.g. Westside, Oak Park, Downtown"
               placeholderTextColor="#9ca3af"
               autoCapitalize="words"
               autoComplete="off"
-              textContentType="addressCityAndState"
+              textContentType="none"
               importantForAutofill="no"
               returnKeyType="next"
             />
-            <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#737972', marginTop: 6 }}>Helps us show you nearby jobs — you can add this later from Edit Profile</Text>
+            <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#737972', marginTop: 6 }}>Your neighbourhood name only — not your street address or house number</Text>
 
-            <Text style={s.label}>{isTeen ? 'ABOUT YOU' : 'ABOUT YOUR FAMILY'} <Text style={{ fontFamily: ds.f.sans, color: '#9ca3af' }}>(optional)</Text></Text>
+            <Text style={s.label}>{isTeen ? 'ABOUT YOU' : 'ABOUT YOUR FAMILY'}{!isTeen && <Text style={{ fontFamily: ds.f.sans, color: '#9ca3af' }}> (optional)</Text>}</Text>
             <TextInput
               style={[s.input, s.textArea]}
               value={bio}
               onChangeText={(t) => setBio(t)}
-              placeholder={isTeen ? 'Tell parents a bit about yourself...' : 'Tell teens about your family...'}
+              placeholder={isTeen ? 'Tell parents a bit about yourself — your personality, experience, why you\'re reliable...' : 'Tell teens about your family...'}
               placeholderTextColor="#9ca3af"
               multiline={true}
               autoComplete="off"
               textContentType="none"
               importantForAutofill="no"
             />
+            {isTeen && <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#737972', marginTop: 6 }}>Required — parents read this to decide whether to hire you</Text>}
 
             {isTeen && (
               <>
+                <Text style={s.label}>YOUR PHONE NUMBER</Text>
+                <TextInput
+                  style={s.input}
+                  value={phone}
+                  onChangeText={(t) => setPhone(t)}
+                  placeholder="e.g. +1 416 555 0123"
+                  placeholderTextColor="#9ca3af"
+                  keyboardType="phone-pad"
+                  autoComplete="off"
+                  textContentType="none"
+                  importantForAutofill="no"
+                  returnKeyType="next"
+                />
+                <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#737972', marginTop: 6 }}>We'll call you on this number to verify your account before you go live</Text>
+
+                <Text style={s.label}>REFERENCE NAME</Text>
+                <TextInput
+                  style={s.input}
+                  value={refName}
+                  onChangeText={(t) => setRefName(t)}
+                  placeholder="e.g. Sarah Johnson (teacher)"
+                  placeholderTextColor="#9ca3af"
+                  autoCapitalize="words"
+                  autoComplete="off"
+                  textContentType="none"
+                  importantForAutofill="no"
+                  returnKeyType="next"
+                />
+                <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#737972', marginTop: 6 }}>An adult who can vouch for you — teacher, coach, family friend, neighbour</Text>
+
+                <Text style={s.label}>REFERENCE CONTACT</Text>
+                <TextInput
+                  style={s.input}
+                  value={refContact}
+                  onChangeText={(t) => setRefContact(t)}
+                  placeholder="Their email or phone number"
+                  placeholderTextColor="#9ca3af"
+                  autoCapitalize="none"
+                  autoComplete="off"
+                  textContentType="none"
+                  importantForAutofill="no"
+                  returnKeyType="next"
+                />
+
                 <Text style={s.label}>HOURLY RATE <Text style={{ fontFamily: ds.f.sans, color: '#9ca3af' }}>(optional)</Text></Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#eef6ef', borderRadius: 12 }}>
                   <Text style={{ paddingLeft: 16, fontSize: 16, color: '#051b0e', fontFamily: ds.f.serifBold }}>$</Text>

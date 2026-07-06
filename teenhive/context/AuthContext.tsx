@@ -20,6 +20,10 @@ export type Profile = {
   is_verified: boolean;
   phone_verified: boolean;
   avatar_url: string | null;
+  phone: string | null;
+  reference_name: string | null;
+  reference_contact: string | null;
+  verification_status: 'pending' | 'verified' | 'rejected' | null;
 };
 
 type SignUpData = {
