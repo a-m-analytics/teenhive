@@ -135,13 +135,11 @@ export default function Signup() {
         availability_val: isTeen ? avail : [],
       });
 
-      if (!data.session) {
-        // Email verification required
-        router.replace({ pathname: '/verify-email', params: { email: email.trim() } } as any);
-      } else {
-        // Auto-confirmed (e.g. dev mode) — go straight in
-        router.replace('/(tabs)' as any);
-      }
+      // Always show how-it-works first; it then routes to verify-email or tabs
+      router.replace({
+        pathname: '/how-it-works',
+        params: { role: role ?? 'teen', email: !data.session ? email.trim() : '' },
+      } as any);
     } catch (e: any) {
       Alert.alert('Signup failed', e.message);
     } finally {

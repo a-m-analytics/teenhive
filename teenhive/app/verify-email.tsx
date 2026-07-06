@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, AppState, Text, TouchableOpacity, View } from 'react-native';
 
 export default function VerifyEmail() {
   const router = useRouter();
@@ -13,7 +13,24 @@ export default function VerifyEmail() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    // Auto-navigate when the deep link sets the session (user tapped email link)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+        router.replace('/(tabs)' as any);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Also poll when app comes back to foreground (user verified in browser)
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', async (state) => {
+      if (state === 'active') {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) router.replace('/(tabs)' as any);
+      }
+    });
+    return () => { sub.remove(); if (timerRef.current) clearInterval(timerRef.current); };
   }, []);
 
   const startCountdown = () => {
@@ -44,17 +61,9 @@ export default function VerifyEmail() {
   const handleCheckVerification = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
-      const role = session.user.user_metadata?.role;
-      if (role === 'parent') {
-        router.replace('/parent-setup' as any);
-      } else {
-        router.replace('/teen-setup' as any);
-      }
+      router.replace('/(tabs)' as any);
     } else {
-      Alert.alert(
-        'Not verified yet',
-        'Please check your email and click the verification link first.'
-      );
+      Alert.alert('Not verified yet', 'Please check your email and tap the verification link first.');
     }
   };
 
@@ -76,7 +85,7 @@ export default function VerifyEmail() {
         {email}
       </Text>
       <Text style={{ fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurfaceVariant, textAlign: 'center', lineHeight: 21, marginBottom: 40 }}>
-        Click the link in the email to verify your account, then come back here and tap the button below.
+        Tap the link in the email — the app will open and sign you in automatically. Or tap below once you've verified.
       </Text>
 
       <TouchableOpacity

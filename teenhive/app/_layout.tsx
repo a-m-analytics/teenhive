@@ -87,6 +87,7 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
         <Stack.Screen name="verify-email" />
+        <Stack.Screen name="how-it-works" />
         <Stack.Screen name="review-modal" options={{ presentation: 'modal' }} />
         <Stack.Screen name="browse-guest" />
       </Stack>
