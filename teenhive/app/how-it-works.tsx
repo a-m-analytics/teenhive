@@ -8,37 +8,37 @@ type Step = { icon: string; title: string; body: string };
 
 const TEEN_STEPS: Step[] = [
   {
-    icon: 'search-outline',
-    title: 'Find jobs nearby',
-    body: 'Browse jobs posted by parents in your neighbourhood — babysitting, yard work, tutoring, and more.',
+    icon: 'add-circle-outline',
+    title: 'Post your services',
+    body: 'Tap the Post button at the bottom to list what you can do — babysitting, tutoring, yard work, and more.',
   },
   {
-    icon: 'paper-plane-outline',
-    title: 'Apply or offer services',
-    body: 'Apply to jobs that suit you, or post your own services so parents can find and invite you directly.',
+    icon: 'search-outline',
+    title: 'Find jobs nearby',
+    body: 'Browse jobs posted by parents in your neighbourhood and find ones that are a great fit for you.',
   },
   {
     icon: 'chatbubble-ellipses-outline',
-    title: 'Chat & get paid',
-    body: 'Once a parent accepts, chat unlocks. Agree on details, do the job, and get paid.',
+    title: 'Apply & get paid',
+    body: 'Apply for jobs or wait for parents to invite you. Once connected, chat to agree on details and get the job done.',
   },
 ];
 
 const PARENT_STEPS: Step[] = [
   {
-    icon: 'create-outline',
+    icon: 'add-circle-outline',
     title: 'Post a job',
-    body: 'Describe what you need, when, and how much you\'re willing to pay. It takes about a minute.',
+    body: 'Tap the Post button at the bottom to describe the job you need — what it is, when, and how much you\'ll pay.',
   },
   {
     icon: 'people-outline',
-    title: 'Find the right teen',
-    body: 'Browse teens in your area by skill or neighbourhood, and invite who looks like a great fit.',
+    title: 'Browse & invite teens',
+    body: 'Browse teens in your area or invite them directly to your job listing. They can also apply on their own.',
   },
   {
-    icon: 'checkmark-circle-outline',
-    title: 'Review & done',
-    body: 'Accept an application, chat to coordinate, then mark the job complete when it\'s done.',
+    icon: 'chatbubble-ellipses-outline',
+    title: 'Chat & coordinate',
+    body: 'Once they accept, chat to plan the details — where to meet, when to start, and whatever else you need.',
   },
 ];
 
