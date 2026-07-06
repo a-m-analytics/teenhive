@@ -25,7 +25,7 @@ export default function PostService() {
   const router = useRouter();
   const { user } = useAuth();
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('');
+  const [categories, setCategories] = useState<string[]>([]);
   const [description, setDescription] = useState('');
   const [hourlyRate, setHourlyRate] = useState('');
   const [selectedAvailability, setSelectedAvailability] = useState<string[]>([]);
@@ -38,9 +38,13 @@ export default function PostService() {
     );
   }
 
+  function toggleCategory(c: string) {
+    setCategories((prev) => prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]);
+  }
+
   const submit = async () => {
-    if (!title.trim() || !category) {
-      Alert.alert('Required fields', 'Fill in a title and select a category.');
+    if (!title.trim() || categories.length === 0) {
+      Alert.alert('Required fields', 'Fill in a title and select at least one category.');
       return;
     }
     if (!user) return;
@@ -56,7 +60,7 @@ export default function PostService() {
     const { error } = await supabase.from('teen_services').insert({
       teen_id: user.id,
       title: title.trim(),
-      category,
+      category: categories.join(', '),
       description: description.trim() || null,
       hourly_rate: hourlyRate ? parseFloat(hourlyRate) : null,
       availability: selectedAvailability.length > 0 ? selectedAvailability : null,
@@ -111,25 +115,29 @@ export default function PostService() {
             />
           </View>
 
-          {/* Category */}
-          <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 12 }}>Category</Text>
+          {/* Category — multi-select */}
+          <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 4 }}>Categories</Text>
+          <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant, marginBottom: 12 }}>Select all that apply</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
-            {CATEGORIES.map((c) => (
-              <TouchableOpacity
-                key={c}
-                style={{
-                  paddingHorizontal: 14, paddingVertical: 9, borderRadius: 9999,
-                  backgroundColor: category === c ? ds.c.primary : ds.c.surfaceContainerHigh,
-                  borderWidth: category === c ? 0 : 1,
-                  borderColor: ds.c.outlineVariant,
-                }}
-                onPress={() => setCategory(c)}
-              >
-                <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: category === c ? ds.c.white : ds.c.onSurfaceVariant }}>
-                  {c}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {CATEGORIES.map((c) => {
+              const selected = categories.includes(c);
+              return (
+                <TouchableOpacity
+                  key={c}
+                  style={{
+                    paddingHorizontal: 14, paddingVertical: 9, borderRadius: 9999,
+                    backgroundColor: selected ? ds.c.primary : ds.c.surfaceContainerHigh,
+                    borderWidth: selected ? 0 : 1,
+                    borderColor: ds.c.outlineVariant,
+                  }}
+                  onPress={() => toggleCategory(c)}
+                >
+                  <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: selected ? ds.c.white : ds.c.onSurfaceVariant }}>
+                    {c}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {/* Description */}

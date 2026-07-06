@@ -181,29 +181,34 @@ function TeenHome() {
             </LinearGradient>
           </PressableScale>
 
-          {/* Secondary cards row */}
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <PressableScale
-              style={{ flex: 1, backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 20 }}
-              onPress={() => router.push('/(tabs)/jobs' as any)}
-            >
-              <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: ds.c.secondaryContainer, justifyContent: 'center', alignItems: 'center', marginBottom: 10 }}>
-                <Ionicons name="briefcase-outline" size={20} color={ds.c.primary} />
-              </View>
-              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 16, color: ds.c.primary, lineHeight: 22, letterSpacing: -0.2 }}>My Applications</Text>
-              <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant, marginTop: 2 }}>Track applied & active</Text>
-            </PressableScale>
-            <PressableScale
-              style={{ flex: 1, backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 20 }}
-              onPress={() => router.push('/browse-jobs' as any)}
-            >
-              <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: ds.c.surfaceContainerHigh, justifyContent: 'center', alignItems: 'center', marginBottom: 10 }}>
-                <Ionicons name="search-outline" size={20} color={ds.c.onSurface} />
-              </View>
-              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 16, color: ds.c.primary, lineHeight: 22, letterSpacing: -0.2 }}>Browse Jobs</Text>
-              <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant, marginTop: 2 }}>All jobs with filters</Text>
-            </PressableScale>
-          </View>
+          {/* Secondary cards — full width stacked */}
+          <PressableScale
+            style={{ backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}
+            onPress={() => router.push('/(tabs)/jobs' as any)}
+          >
+            <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: ds.c.secondaryContainer, justifyContent: 'center', alignItems: 'center' }}>
+              <Ionicons name="briefcase-outline" size={22} color={ds.c.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 17, color: ds.c.primary, letterSpacing: -0.2 }}>My Applications</Text>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant, marginTop: 2 }}>Track applied, active & completed</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={ds.c.outlineVariant} />
+          </PressableScale>
+
+          <PressableScale
+            style={{ backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}
+            onPress={() => router.push('/browse-jobs' as any)}
+          >
+            <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: ds.c.surfaceContainerHigh, justifyContent: 'center', alignItems: 'center' }}>
+              <Ionicons name="search-outline" size={22} color={ds.c.onSurface} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 17, color: ds.c.primary, letterSpacing: -0.2 }}>Browse Jobs</Text>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant, marginTop: 2 }}>All jobs near you with filters</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={ds.c.outlineVariant} />
+          </PressableScale>
         </View>
 
         {/* ── Top Categories ── */}
@@ -215,7 +220,7 @@ function TeenHome() {
         </View>
 
         {/* Category chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', paddingHorizontal: 24, gap: 8 }} style={{ marginBottom: 16 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 24, gap: 8, alignItems: 'center' }} style={{ marginBottom: 16 }}>
           {CATEGORIES.map((cat) => (
             <TouchableOpacity
               key={cat}
