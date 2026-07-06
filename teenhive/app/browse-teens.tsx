@@ -5,7 +5,7 @@ import { ds, dsLabel, dsSecondaryLabel } from '@/lib/design';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 type Teen = {
@@ -52,12 +52,15 @@ export default function BrowseTeens() {
   const [skillFilter, setSkillFilter] = useState('Any');
   const [sortBy, setSortBy] = useState<SortOption>('jobs');
   const [payFilter, setPayFilter] = useState<PayFilter>('any');
+  const [neighborhood, setNeighborhood] = useState('');
+  const [neighborhoods, setNeighborhoods] = useState<{ name: string; count: number }[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [inviting, setInviting] = useState<string | null>(null);
   const [invited, setInvited] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchTeens();
+    fetchNeighborhoods();
   }, []);
 
   const fetchTeens = async () => {
@@ -77,6 +80,15 @@ export default function BrowseTeens() {
     if (data) setTeens(data as Teen[]);
     setLoading(false);
   };
+
+  const fetchNeighborhoods = useCallback(async () => {
+    const { data } = await supabase.from('profiles').select('neighborhood').not('neighborhood', 'is', null);
+    if (!data) return;
+    const counts: Record<string, number> = {};
+    data.forEach((p: any) => { if (p.neighborhood) counts[p.neighborhood] = (counts[p.neighborhood] ?? 0) + 1; });
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
+    setNeighborhoods(sorted);
+  }, []);
 
   const handleInvite = async (teen: Teen) => {
     if (!user || !jobId) return;
@@ -129,7 +141,7 @@ export default function BrowseTeens() {
     { label: '17+', value: '17+' },
   ];
 
-  const hasActiveFilters = ageFilter !== 'any' || skillFilter !== 'Any' || payFilter !== 'any' || sortBy !== 'jobs';
+  const hasActiveFilters = ageFilter !== 'any' || skillFilter !== 'Any' || payFilter !== 'any' || sortBy !== 'jobs' || neighborhood !== '';
 
   const filtered = teens
     .filter((t) => {
@@ -149,7 +161,8 @@ export default function BrowseTeens() {
         (payFilter === '10' && (t.hourly_rate == null || t.hourly_rate < 10)) ||
         (payFilter === '15' && (t.hourly_rate == null || t.hourly_rate < 15)) ||
         (payFilter === '20' && (t.hourly_rate == null || t.hourly_rate < 20));
-      return searchMatch && ageMatch && skillMatch && payMatch;
+      const neighborhoodMatch = neighborhood === '' || t.neighborhood?.toLowerCase() === neighborhood.toLowerCase();
+      return searchMatch && ageMatch && skillMatch && payMatch && neighborhoodMatch;
     })
     .sort((a, b) => {
       if (sortBy === 'jobs') return (b.jobs_completed ?? 0) - (a.jobs_completed ?? 0);
@@ -187,6 +200,37 @@ export default function BrowseTeens() {
         </View>
       </View>
 
+      {/* Neighbourhood quick chips */}
+      {neighborhoods.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 24, gap: 8, alignItems: 'center', paddingBottom: 8 }}
+          style={{ marginBottom: 4 }}
+        >
+          {neighborhoods.map(({ name, count }) => {
+            const active = neighborhood === name;
+            return (
+              <TouchableOpacity
+                key={name}
+                onPress={() => setNeighborhood(active ? '' : name)}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 4,
+                  paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9999,
+                  backgroundColor: active ? ds.c.primary : ds.c.surfaceContainerLow,
+                  borderWidth: active ? 0 : 1, borderColor: ds.c.outlineVariant,
+                }}
+              >
+                <Ionicons name="location-outline" size={11} color={active ? ds.c.white : ds.c.onSurfaceVariant} />
+                <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 12, color: active ? ds.c.white : ds.c.onSurfaceVariant }}>
+                  {name} ({count})
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
+
       {/* Filter toggle row */}
       <View style={{ flexDirection: 'row', paddingHorizontal: 24, marginBottom: 8, gap: 8, alignItems: 'center' }}>
         <TouchableOpacity
@@ -199,7 +243,7 @@ export default function BrowseTeens() {
           </Text>
         </TouchableOpacity>
         {hasActiveFilters && (
-          <TouchableOpacity onPress={() => { setAgeFilter('any'); setSkillFilter('Any'); setPayFilter('any'); setSortBy('jobs'); }}>
+          <TouchableOpacity onPress={() => { setAgeFilter('any'); setSkillFilter('Any'); setPayFilter('any'); setSortBy('jobs'); setNeighborhood(''); }}>
             <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ds.c.secondary }}>Clear all</Text>
           </TouchableOpacity>
         )}
@@ -223,10 +267,39 @@ export default function BrowseTeens() {
             </View>
           </View>
 
+          {/* Neighbourhood */}
+          {neighborhoods.length > 0 && (
+            <View>
+              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: ds.c.onSurfaceVariant, letterSpacing: 1.2, marginBottom: 8 }}>NEIGHBOURHOOD</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                {neighborhoods.map(({ name, count }) => {
+                  const active = neighborhood === name;
+                  return (
+                    <TouchableOpacity
+                      key={name}
+                      onPress={() => setNeighborhood(active ? '' : name)}
+                      style={{
+                        flexDirection: 'row', alignItems: 'center', gap: 4,
+                        paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9999,
+                        backgroundColor: active ? ds.c.primary : ds.c.surfaceContainerLow,
+                        borderWidth: active ? 0 : 1, borderColor: ds.c.outlineVariant,
+                      }}
+                    >
+                      <Ionicons name="location-outline" size={11} color={active ? ds.c.white : ds.c.onSurfaceVariant} />
+                      <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 12, color: active ? ds.c.white : ds.c.onSurfaceVariant }}>
+                        {name} ({count})
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
           {/* Skill/Category */}
           <View>
             <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: ds.c.onSurfaceVariant, letterSpacing: 1.2, marginBottom: 8 }}>SKILL / CATEGORY</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 8 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
               {SKILL_CATEGORIES.map((cat) => (
                 <TouchableOpacity
                   key={cat}

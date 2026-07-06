@@ -124,15 +124,16 @@ export default function Signup() {
 
       trackSignUp(data.user.id, (role ?? 'teen') as 'teen' | 'parent');
 
-      // Save profile data regardless — Supabase trigger creates the profile row
-      await supabase.from('profiles').update({
-        age: parseInt(age, 10) || null,
-        neighborhood: neighborhood.trim() || null,
-        bio: bio.trim() || null,
-        hourly_rate: isTeen && hourlyRate ? parseFloat(hourlyRate) : null,
-        skills: isTeen ? skills : [],
-        availability: isTeen ? avail : [],
-      }).eq('id', data.user.id);
+      // Use SECURITY DEFINER RPC so profile data saves even before email is confirmed
+      await supabase.rpc('init_profile', {
+        user_id: data.user.id,
+        age_val: parseInt(age, 10) || null,
+        bio_val: bio.trim() || null,
+        neighborhood_val: neighborhood.trim() || null,
+        hourly_rate_val: isTeen && hourlyRate ? parseFloat(hourlyRate) : null,
+        skills_val: isTeen ? skills : [],
+        availability_val: isTeen ? avail : [],
+      });
 
       if (!data.session) {
         // Email verification required
