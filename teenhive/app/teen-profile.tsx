@@ -2,8 +2,10 @@ import GradientButton from '@/components/GradientButton';
 import { useAuth } from '@/context/AuthContext';
 import { trackProfileViewed, trackInviteSent } from '@/lib/analytics';
 import { ds, dsLabel, dsSecondaryLabel } from '@/lib/design';
+import { getReviews } from '@/lib/reviews';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -16,6 +18,12 @@ type Teen = {
   id: string; full_name: string; age: number | null; bio: string | null;
   neighborhood: string | null; skills: string[]; availability: string[];
   hourly_rate: number | null; jobs_completed: number; trust_score: number;
+  is_verified: boolean; avatar_url: string | null; rating: number | null; rating_count: number | null;
+};
+
+type Review = {
+  id: string; rating: number; comment: string | null; created_at: string;
+  reviewer: { full_name: string } | null;
 };
 
 function getInitials(name: string): string {
@@ -45,14 +53,16 @@ export default function TeenProfile() {
   const [reportReason, setReportReason] = useState('');
   const [reportDetails, setReportDetails] = useState('');
   const [menuVisible, setMenuVisible] = useState(false);
+  const [reviews, setReviews] = useState<Review[]>([]);
 
   useEffect(() => {
     if (!id) return;
-    supabase.from('profiles').select('id, full_name, age, bio, neighborhood, skills, availability, hourly_rate, jobs_completed, trust_score').eq('id', id).single().then((teenRes) => {
+    supabase.from('profiles').select('id, full_name, age, bio, neighborhood, skills, availability, hourly_rate, jobs_completed, trust_score, is_verified, avatar_url, rating, rating_count').eq('id', id).single().then((teenRes) => {
       if (teenRes.data) setTeen(teenRes.data as Teen);
       setLoading(false);
       if (user && id && user.id !== id) trackProfileViewed(user.id, id, 'teen');
     });
+    getReviews(id).then(({ data }) => { if (data) setReviews(data as Review[]); });
   }, [id]);
 
   async function openInviteModal() {
@@ -147,11 +157,19 @@ export default function TeenProfile() {
           {/* Avatar + name */}
           <View style={{ alignItems: 'center', paddingTop: 8 }}>
             <View style={{ width: 90, height: 90, borderRadius: 45, backgroundColor: ds.c.secondaryContainer, justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 32, color: ds.c.primary }}>{initials}</Text>
+              {teen.avatar_url
+                ? <Image source={{ uri: teen.avatar_url }} style={{ width: 90, height: 90, borderRadius: 45 }} />
+                : <Text style={{ fontFamily: ds.f.sansBold, fontSize: 32, color: ds.c.primary }}>{initials}</Text>
+              }
             </View>
-            <Text style={{ fontFamily: ds.f.serifBold, fontSize: 36, color: ds.c.white, lineHeight: 42, letterSpacing: -0.3, marginBottom: 8, textAlign: 'center' }}>
-              {teen.full_name}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 36, color: ds.c.white, lineHeight: 42, letterSpacing: -0.3, textAlign: 'center' }}>
+                {teen.full_name}
+              </Text>
+              {teen.is_verified && (
+                <Ionicons name="checkmark-circle" size={26} color={ds.c.secondary} />
+              )}
+            </View>
             {teen.age ? (
               <Text style={{ fontFamily: ds.f.sansBold, fontSize: 20, color: 'rgba(243,251,244,0.85)', marginBottom: 4 }}>Age {teen.age}</Text>
             ) : null}
@@ -222,6 +240,39 @@ export default function TeenProfile() {
                   </View>
                 </>
               )}
+            </View>
+          )}
+
+          {/* Reviews */}
+          {reviews.length > 0 && (
+            <View style={{ marginBottom: 24 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant }}>Reviews</Text>
+                {teen.rating != null && teen.rating > 0 && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={{ fontSize: 13, color: '#f59e0b' }}>★</Text>
+                    <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: ds.c.primary }}>{teen.rating.toFixed(1)}</Text>
+                    <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>({teen.rating_count})</Text>
+                  </View>
+                )}
+              </View>
+              {reviews.map((r) => (
+                <View key={r.id} style={{ backgroundColor: ds.c.surfaceContainerLow, borderRadius: 18, padding: 18, marginBottom: 10 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ds.c.primary }}>
+                      {r.reviewer?.full_name ?? 'Parent'}
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 2 }}>
+                      {[1,2,3,4,5].map((n) => (
+                        <Text key={n} style={{ fontSize: 13, color: n <= r.rating ? '#f59e0b' : ds.c.outlineVariant }}>★</Text>
+                      ))}
+                    </View>
+                  </View>
+                  {r.comment ? (
+                    <Text style={{ fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurface, lineHeight: 20 }}>{r.comment}</Text>
+                  ) : null}
+                </View>
+              ))}
             </View>
           )}
 

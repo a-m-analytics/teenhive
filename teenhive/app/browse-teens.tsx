@@ -18,6 +18,7 @@ type Teen = {
   hourly_rate: number | null;
   jobs_completed?: number;
   created_at?: string;
+  is_verified?: boolean;
 };
 
 type SortOption = 'jobs' | 'newest' | 'pay_asc';
@@ -74,7 +75,7 @@ export default function BrowseTeens() {
     if (teenIds.length === 0) { setTeens([]); setLoading(false); return; }
     const { data } = await supabase
       .from('profiles')
-      .select('id, full_name, age, neighborhood, bio, skills, hourly_rate, jobs_completed, created_at')
+      .select('id, full_name, age, neighborhood, bio, skills, hourly_rate, jobs_completed, created_at, is_verified')
       .eq('role', 'teen')
       .in('id', teenIds);
     if (data) setTeens(data as Teen[]);
@@ -367,15 +368,28 @@ export default function BrowseTeens() {
                     <Text style={{ fontFamily: ds.f.sansBold, fontSize: 16, color: ds.c.white }}>{initials}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: ds.f.sansBold, fontSize: 15, color: ds.c.onSurface, marginBottom: 2 }}>
-                      {teen.full_name}{teen.age ? `, ${teen.age}` : ''}
-                    </Text>
-                    {teen.neighborhood ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                        <Ionicons name="location-outline" size={12} color={ds.c.onSurfaceVariant} />
-                        <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>{teen.neighborhood}</Text>
-                      </View>
-                    ) : null}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontFamily: ds.f.sansBold, fontSize: 15, color: ds.c.onSurface }}>
+                        {teen.full_name}{teen.age ? `, ${teen.age}` : ''}
+                      </Text>
+                      {teen.is_verified && (
+                        <Ionicons name="checkmark-circle" size={16} color={ds.c.secondary} />
+                      )}
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 3 }}>
+                      {teen.neighborhood ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <Ionicons name="location-outline" size={11} color={ds.c.onSurfaceVariant} />
+                          <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>{teen.neighborhood}</Text>
+                        </View>
+                      ) : null}
+                      {(teen.jobs_completed ?? 0) > 0 && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <Ionicons name="briefcase-outline" size={11} color={ds.c.onSurfaceVariant} />
+                          <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>{teen.jobs_completed} jobs done</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
                   {teen.hourly_rate ? (
                     <View style={{ backgroundColor: ds.c.secondaryContainer, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 4 }}>

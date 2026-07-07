@@ -29,6 +29,14 @@ const SECTIONS = [
     body: 'By posting on Teen Hive, you give us permission to display your content within the app. You retain ownership. Do not post content that is illegal, harmful, or violates anyone\'s privacy.',
   },
   {
+    title: 'Limitation of Liability',
+    body: 'Teen Hive is a platform that facilitates connections between users. We are not responsible for any interactions, incidents, disputes, injuries, losses, or damages that occur between users, whether in person or otherwise. All arrangements made through the app are solely between the teen and the parent/guardian. Teen Hive is not a party to any agreement, transaction, or interaction. Use of this app is entirely at your own risk.',
+  },
+  {
+    title: 'No Warranties',
+    body: 'Teen Hive is provided "as is" without any warranty of any kind. We do not guarantee the accuracy of user profiles, the quality of work performed, or any outcome from using the platform. We are not responsible for the conduct, character, or reliability of any user.',
+  },
+  {
     title: 'Termination',
     body: 'We reserve the right to suspend or delete accounts that violate these terms. You can delete your own account at any time from your profile.',
   },
