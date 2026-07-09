@@ -328,7 +328,7 @@ export default function Signup() {
               importantForAutofill="no"
               returnKeyType="next"
             />
-            <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#737972', marginTop: 6 }}>Neighbourhood name only — no street address</Text>
+            <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#737972', marginTop: 6 }}>Just your neighbourhood name (e.g. Timarron) — please do not put your street name or house number here</Text>
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 20, marginBottom: 8 }}>
               <Text style={[s.label, { marginTop: 0, marginBottom: 0 }]}>{isTeen ? 'ABOUT YOU' : 'ABOUT YOUR FAMILY'}</Text>
