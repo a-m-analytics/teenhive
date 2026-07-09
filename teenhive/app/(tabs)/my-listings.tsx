@@ -86,13 +86,13 @@ export default function MyListingsTab() {
           .from('applications')
           .select('id, job_id, teen_id, status, created_at, teen:profiles!teen_id(id, full_name, rating, jobs_completed)')
           .in('job_id', jobIds)
-          .in('status', ['pending', 'accepted', 'invited']);
+          .in('status', ['pending', 'accepted', 'invited', 'completed']);
         if (apps) {
-          setApplicants(apps as unknown as Applicant[]);
-          // Build map of job_id → accepted teen
+          setApplicants(apps.filter((a: any) => a.status !== 'completed') as unknown as Applicant[]);
+          // Build map of job_id → accepted/completed teen (for review button)
           const map: Record<string, { id: string; full_name: string }> = {};
           for (const a of apps as any[]) {
-            if (a.status === 'accepted' && a.teen) map[a.job_id] = a.teen;
+            if ((a.status === 'accepted' || a.status === 'completed') && a.teen) map[a.job_id] = a.teen;
           }
           setAcceptedTeens(map);
         }
@@ -386,12 +386,14 @@ export default function MyListingsTab() {
                   );
                 })()}
 
-                {tab === 'Completed' && (
+                {tab === 'Completed' && acceptedTeens[listing.id] && (
                   <TouchableOpacity
                     style={{ borderWidth: 1, borderColor: ds.c.outlineVariant, borderRadius: 9999, paddingVertical: 14, alignItems: 'center' }}
-                    onPress={() => router.push(`/review-modal?jobId=${listing.id}&revieweeId=${acceptedTeens[listing.id]?.id ?? ''}&jobTitle=${encodeURIComponent(listing.title)}` as any)}
+                    onPress={() => router.push(`/review-modal?jobId=${listing.id}&revieweeId=${acceptedTeens[listing.id].id}&jobTitle=${encodeURIComponent(listing.title)}` as any)}
                   >
-                    <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: ds.c.onSurface }}>Leave a Review</Text>
+                    <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: ds.c.onSurface }}>
+                      Leave a Review for {acceptedTeens[listing.id].full_name.split(' ')[0]}
+                    </Text>
                   </TouchableOpacity>
                 )}
               </View>

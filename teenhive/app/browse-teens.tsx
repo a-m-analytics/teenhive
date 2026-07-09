@@ -383,10 +383,14 @@ export default function BrowseTeens() {
                           <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>{teen.neighborhood}</Text>
                         </View>
                       ) : null}
-                      {(teen.jobs_completed ?? 0) > 0 && (
+                      {(teen.jobs_completed ?? 0) > 0 ? (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                           <Ionicons name="briefcase-outline" size={11} color={ds.c.onSurfaceVariant} />
                           <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>{teen.jobs_completed} jobs done</Text>
+                        </View>
+                      ) : (
+                        <View style={{ backgroundColor: ds.c.secondaryContainer, borderRadius: 9999, paddingHorizontal: 8, paddingVertical: 2 }}>
+                          <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 11, color: ds.c.primary }}>New</Text>
                         </View>
                       )}
                     </View>

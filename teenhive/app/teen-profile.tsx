@@ -244,37 +244,48 @@ export default function TeenProfile() {
           )}
 
           {/* Reviews */}
-          {reviews.length > 0 && (
-            <View style={{ marginBottom: 24 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant }}>Reviews</Text>
-                {teen.rating != null && teen.rating > 0 && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <Text style={{ fontSize: 13, color: '#f59e0b' }}>★</Text>
-                    <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: ds.c.primary }}>{teen.rating.toFixed(1)}</Text>
-                    <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>({teen.rating_count})</Text>
-                  </View>
-                )}
-              </View>
-              {reviews.map((r) => (
-                <View key={r.id} style={{ backgroundColor: ds.c.surfaceContainerLow, borderRadius: 18, padding: 18, marginBottom: 10 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                    <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ds.c.primary }}>
-                      {r.reviewer?.full_name ?? 'Parent'}
-                    </Text>
-                    <View style={{ flexDirection: 'row', gap: 2 }}>
-                      {[1,2,3,4,5].map((n) => (
-                        <Text key={n} style={{ fontSize: 13, color: n <= r.rating ? '#f59e0b' : ds.c.outlineVariant }}>★</Text>
-                      ))}
-                    </View>
-                  </View>
-                  {r.comment ? (
-                    <Text style={{ fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurface, lineHeight: 20 }}>{r.comment}</Text>
-                  ) : null}
+          <View style={{ marginBottom: 24 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant }}>Reviews</Text>
+              {teen.rating != null && teen.rating > 0 && (reviews.length > 0) && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={{ fontSize: 14, color: '#f59e0b' }}>★</Text>
+                  <Text style={{ fontFamily: ds.f.sansBold, fontSize: 14, color: ds.c.primary }}>{teen.rating.toFixed(1)}</Text>
+                  <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant }}>
+                    ({teen.rating_count} {(teen.rating_count ?? 0) === 1 ? 'review' : 'reviews'})
+                  </Text>
                 </View>
-              ))}
+              )}
             </View>
-          )}
+            {reviews.length === 0 ? (
+              <View style={{ backgroundColor: ds.c.surfaceContainerLow, borderRadius: 18, padding: 20, alignItems: 'center' }}>
+                <Text style={{ fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurfaceVariant }}>No reviews yet</Text>
+              </View>
+            ) : (
+              reviews.map((r) => {
+                const firstName = (r.reviewer?.full_name ?? 'Parent').split(' ')[0];
+                const date = new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                return (
+                  <View key={r.id} style={{ backgroundColor: ds.c.surfaceContainerLow, borderRadius: 18, padding: 18, marginBottom: 10 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: ds.c.primary }}>{firstName}</Text>
+                        <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>{date}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 1 }}>
+                        {[1,2,3,4,5].map((n) => (
+                          <Text key={n} style={{ fontSize: 14, color: n <= r.rating ? '#f59e0b' : ds.c.outlineVariant }}>★</Text>
+                        ))}
+                      </View>
+                    </View>
+                    {r.comment ? (
+                      <Text style={{ fontFamily: ds.f.sans, fontSize: 14, color: ds.c.onSurface, lineHeight: 21 }}>{r.comment}</Text>
+                    ) : null}
+                  </View>
+                );
+              })
+            )}
+          </View>
 
         </View>
       </ScrollView>

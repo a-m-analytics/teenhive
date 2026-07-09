@@ -88,8 +88,8 @@ export default function Signup() {
         Alert.alert('Error', 'Parents must be 18 or older.');
         return;
       }
-      if (!bio.trim()) {
-        Alert.alert('Missing info', isTeen ? 'Please write a short bio so parents know who you are.' : 'Please write a short bio so teens know about your family.');
+      if (bio.trim().length < 20) {
+        Alert.alert('Bio too short', 'Please write a short bio before continuing — at least 20 characters.');
         return;
       }
       if (isTeen && skills.length === 0) {
@@ -328,21 +328,26 @@ export default function Signup() {
               importantForAutofill="no"
               returnKeyType="next"
             />
-            <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#737972', marginTop: 6 }}>Your neighbourhood name only — not your street address or house number</Text>
+            <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#737972', marginTop: 6 }}>Neighbourhood name only — no street address</Text>
 
-            <Text style={s.label}>{isTeen ? 'ABOUT YOU' : 'ABOUT YOUR FAMILY'}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 20, marginBottom: 8 }}>
+              <Text style={[s.label, { marginTop: 0, marginBottom: 0 }]}>{isTeen ? 'ABOUT YOU' : 'ABOUT YOUR FAMILY'}</Text>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: bio.length >= 20 ? '#737972' : '#ef4444' }}>{bio.length}/300</Text>
+            </View>
             <TextInput
               style={[s.input, s.textArea]}
               value={bio}
-              onChangeText={(t) => setBio(t)}
-              placeholder={isTeen ? 'Tell parents a bit about yourself — your personality, experience, why you\'re reliable...' : 'Tell teens about your family...'}
+              onChangeText={(t) => setBio(t.slice(0, 300))}
+              placeholder={isTeen ? 'Tell parents a bit about yourself — your personality, experience, why you\'re reliable...' : 'Tell teens about your family and what you need help with...'}
               placeholderTextColor="#9ca3af"
               multiline={true}
               autoComplete="off"
               textContentType="none"
               importantForAutofill="no"
             />
-            {isTeen && <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#737972', marginTop: 6 }}>Required — parents read this to decide whether to hire you</Text>}
+            <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#737972', marginTop: 6 }}>
+              {bio.trim().length < 20 && bio.length > 0 ? `${20 - bio.trim().length} more characters needed` : 'Required — minimum 20 characters'}
+            </Text>
 
             {isTeen && (
               <>
