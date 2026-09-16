@@ -140,7 +140,7 @@ export default function Signup() {
 
       trackSignUp(data.user.id, (role ?? 'teen') as 'teen' | 'parent');
 
-      await supabase.rpc('init_profile', {
+      const { error: initError } = await supabase.rpc('init_profile', {
         user_id: data.user.id,
         age_val: parseInt(age, 10) || null,
         bio_val: bio.trim() || null,
@@ -149,6 +149,12 @@ export default function Signup() {
         skills_val: isTeen ? skills : [],
         availability_val: isTeen ? avail : [],
       });
+      if (initError) {
+        Alert.alert(
+          'Profile setup incomplete',
+          'Your account was created, but we couldn\'t save your profile details. You can fill them in from your profile page.'
+        );
+      }
 
       router.replace({
         pathname: '/how-it-works',

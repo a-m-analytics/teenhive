@@ -89,11 +89,12 @@ function TeenHome() {
     if (category !== 'All') query = query.eq('category', category);
     if (search.trim()) query = query.ilike('title', `%${search.trim()}%`);
     if (minPay != null) query = query.gte('pay_rate', minPay);
+    if (profile?.neighborhood) query = query.eq('location_area', profile.neighborhood);
     query = query.neq('job_type', 'community');
     const { data, error } = await query.order('created_at', { ascending: false }).limit(3);
     if (!error && data) setJobs(data);
     setLoadingJobs(false);
-  }, []);
+  }, [profile?.neighborhood]);
 
   const fetchServices = useCallback(async () => {
     if (!user) return;
@@ -243,6 +244,20 @@ function TeenHome() {
             <View style={{ flex: 1 }}>
               <Text style={{ fontFamily: ds.f.serifBold, fontSize: 17, color: ds.c.primary, letterSpacing: -0.2 }}>Browse Jobs</Text>
               <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant, marginTop: 2 }}>All jobs near you with filters</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={ds.c.outlineVariant} />
+          </PressableScale>
+
+          <PressableScale
+            style={{ backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}
+            onPress={() => router.push('/browse-teens' as any)}
+          >
+            <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: ds.c.surfaceContainerHigh, justifyContent: 'center', alignItems: 'center' }}>
+              <Ionicons name="people-outline" size={22} color={ds.c.onSurface} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 17, color: ds.c.primary, letterSpacing: -0.2 }}>Browse Teens</Text>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant, marginTop: 2 }}>See who else is around your area</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={ds.c.outlineVariant} />
           </PressableScale>

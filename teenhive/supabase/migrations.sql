@@ -147,3 +147,40 @@ create policy "Parents can update own job applications"
   on applications for update
   to authenticated
   using (auth.uid() = parent_id OR auth.uid() = teen_id);
+
+-- 20. init_profile RPC — signup.tsx calls this immediately after auth.signUp(),
+--     before email confirmation, so there is no session yet and RLS would block
+--     a normal client-side update. SECURITY DEFINER lets it bypass RLS safely,
+--     scoped to exactly the fields signup collects. This function was missing
+--     entirely, so every signup's age/bio/neighborhood/rate/skills/availability
+--     was silently dropped (the RPC call errored and the error was never checked).
+create or replace function public.init_profile(
+  user_id uuid,
+  age_val integer,
+  bio_val text,
+  neighborhood_val text,
+  hourly_rate_val numeric,
+  skills_val text[],
+  availability_val text[]
+)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  update public.profiles
+  set age          = age_val,
+      bio          = bio_val,
+      neighborhood = neighborhood_val,
+      hourly_rate  = hourly_rate_val,
+      skills       = coalesce(skills_val, '{}'),
+      availability = coalesce(availability_val, '{}')
+  where id = user_id;
+end;
+$$;
+
+grant execute on function public.init_profile(uuid, integer, text, text, numeric, text[], text[]) to anon, authenticated;
+
+-- 21. Multi-location support: let a teen pick several locations they're
+--     willing to work in (in addition to/on top of their single home `neighborhood`).
+alter table profiles add column if not exists work_locations text[] default '{}';

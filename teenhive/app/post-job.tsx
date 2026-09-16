@@ -1,4 +1,5 @@
 import GradientButton from '@/components/GradientButton';
+import CityPicker from '@/components/CityPicker';
 import { useAuth } from '@/context/AuthContext';
 import { ds, dsField, dsLabel } from '@/lib/design';
 import { supabase } from '@/lib/supabase';
@@ -40,6 +41,7 @@ export default function PostJob() {
   const [durationHours, setDurationHours] = useState('');
   const [durationMins, setDurationMins] = useState('0');
   const [location, setLocation] = useState('');
+  const [showCityPicker, setShowCityPicker] = useState(false);
   const [recurring, setRecurring] = useState(false);
   const [recurringDays, setRecurringDays] = useState<string[]>([]);
   const [numKids, setNumKids] = useState('');
@@ -93,7 +95,7 @@ export default function PostJob() {
       return;
     }
     if (!location.trim()) {
-      Alert.alert('Location required', 'Please enter your neighbourhood or area so teens near you can find this job.');
+      Alert.alert('Location required', 'Please select the city where this job is so teens near you can find it.');
       return;
     }
     if (!user) return;
@@ -420,16 +422,23 @@ export default function PostJob() {
 
           {/* Location */}
           <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 8 }}>Location <Text style={{ color: '#dc2626' }}>*</Text></Text>
-          <View style={{ ...dsField, marginBottom: 24 }}>
+          <TouchableOpacity
+            style={{ ...dsField, marginBottom: 24 }}
+            onPress={() => setShowCityPicker(true)}
+          >
             <Ionicons name="location-outline" size={18} color={ds.c.onSurfaceVariant} />
-            <TextInput
-              style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurface }}
-              placeholder="Neighborhood only (e.g. Oak Street area)"
-              placeholderTextColor={ds.c.outlineVariant}
-              value={location}
-              onChangeText={setLocation}
-            />
-          </View>
+            <Text style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 15, color: location ? ds.c.onSurface : ds.c.outlineVariant }}>
+              {location || 'Select city'}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color={ds.c.onSurfaceVariant} />
+          </TouchableOpacity>
+
+          <CityPicker
+            visible={showCityPicker}
+            value={location}
+            onSelect={(city) => { setLocation(city); setShowCityPicker(false); }}
+            onClose={() => setShowCityPicker(false)}
+          />
 
           {/* Recurring toggle */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: recurring ? 16 : 24, backgroundColor: ds.c.surfaceContainerHigh, borderRadius: 16, padding: 16 }}>

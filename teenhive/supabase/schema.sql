@@ -15,6 +15,7 @@ create table if not exists public.profiles (
   bio              text,
   avatar_url       text,
   neighborhood     text,
+  work_locations   text[]      default '{}',
   hourly_rate      numeric,
   skills           text[]      default '{}',
   availability     text[]      default '{}',
@@ -252,3 +253,38 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+
+-- ============================================================
+-- 8. FINISH PROFILE SETUP AFTER SIGNUP
+--    signup.tsx calls this right after auth.signUp(), before email
+--    confirmation — there is no session yet, so RLS would block a normal
+--    client-side update. SECURITY DEFINER bypasses RLS safely, scoped to
+--    exactly the fields signup collects.
+-- ============================================================
+create or replace function public.init_profile(
+  user_id uuid,
+  age_val integer,
+  bio_val text,
+  neighborhood_val text,
+  hourly_rate_val numeric,
+  skills_val text[],
+  availability_val text[]
+)
+returns void
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  update public.profiles
+  set age          = age_val,
+      bio          = bio_val,
+      neighborhood = neighborhood_val,
+      hourly_rate  = hourly_rate_val,
+      skills       = coalesce(skills_val, '{}'),
+      availability = coalesce(availability_val, '{}')
+  where id = user_id;
+end;
+$$;
+
+grant execute on function public.init_profile(uuid, integer, text, text, numeric, text[], text[]) to anon, authenticated;

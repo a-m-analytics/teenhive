@@ -25,7 +25,7 @@ type SortVal = 'newest' | 'pay_high' | 'pay_low';
 
 export default function BrowseJobs() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -35,14 +35,24 @@ export default function BrowseJobs() {
   const [showFilters, setShowFilters] = useState(false);
   const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
   const [neighborhood, setNeighborhood] = useState('');
+  const [cityInitialized, setCityInitialized] = useState(false);
   const [showCityPicker, setShowCityPicker] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Default the city filter to the teen's own location once their profile loads,
+  // so jobs are local by default instead of showing everything unfiltered.
+  useEffect(() => {
+    if (!cityInitialized && profile?.neighborhood) {
+      setNeighborhood(profile.neighborhood);
+      setCityInitialized(true);
+    }
+  }, [profile?.neighborhood, cityInitialized]);
 
   const fetchJobs = useCallback(async (q: string, cat: string, pIdx: number, sort: SortVal) => {
     setLoading(true);
     let query = supabase
       .from('jobs')
-      .select('*, parent:profiles!parent_id(id, full_name, is_verified, neighborhood)')
+      .select('*, parent:profiles!parent_id(id, full_name, is_verified)')
       .eq('status', 'open');
     if (cat !== 'All') query = query.eq('category', cat);
     if (q.trim()) query = query.ilike('title', `%${q.trim()}%`);
@@ -77,7 +87,7 @@ export default function BrowseJobs() {
 
   const visibleJobs = neighborhood === ''
     ? jobs
-    : jobs.filter((j) => j.parent?.neighborhood === neighborhood);
+    : jobs.filter((j) => j.location_area === neighborhood);
 
   async function toggleSave(jobId: string) {
     if (!user) return;

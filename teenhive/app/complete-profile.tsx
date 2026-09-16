@@ -37,16 +37,7 @@ export default function CompleteProfile() {
     if (!imageUri || !user) return;
     setUploading(true);
     try {
-      const ext = imageUri.split('.').pop()?.toLowerCase() ?? 'jpg';
-      const path = `${user.id}/avatar.${ext}`;
-      const response = await fetch(imageUri);
-      const arrayBuffer = await response.arrayBuffer();
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(path, arrayBuffer, { contentType: `image/${ext}`, upsert: true });
-      if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
-      await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', user.id);
+      await withTimeout(uploadPhoto(imageUri, user.id), 20000, 'Upload timed out — check your connection and try again.');
       // Refresh profile in context so AuthGate sees the new avatar_url
       await refreshProfile();
     } catch (e: any) {
@@ -55,6 +46,27 @@ export default function CompleteProfile() {
       setUploading(false);
     }
   };
+
+  async function uploadPhoto(uri: string, userId: string) {
+    const ext = uri.split('.').pop()?.toLowerCase() ?? 'jpg';
+    const path = `${userId}/avatar.${ext}`;
+    const response = await fetch(uri);
+    const arrayBuffer = await response.arrayBuffer();
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(path, arrayBuffer, { contentType: `image/${ext}`, upsert: true });
+    if (uploadError) throw uploadError;
+    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
+    const { error: updateError } = await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', userId);
+    if (updateError) throw updateError;
+  }
+
+  function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+    ]);
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: ds.c.bg, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32 }}>
