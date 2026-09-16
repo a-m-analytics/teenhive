@@ -69,6 +69,7 @@ export default function PostService() {
     });
     setSubmitting(false);
     if (error) { Alert.alert('Error', error.message); return; }
+    supabase.functions.invoke('notify-parents-nearby-teen', { body: { teen_id: user.id } }).catch(() => {});
     Alert.alert('Posted!', `"${title}" is now visible to parents in your area.`, [
       { text: 'OK', onPress: () => router.back() },
     ]);

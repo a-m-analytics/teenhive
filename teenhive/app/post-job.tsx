@@ -144,7 +144,10 @@ export default function PostJob() {
           created_at: new Date().toISOString(),
         }).select().single();
         if (error) throw error;
-        if (data) trackJobPosted(data.id, category, parseFloat(payAmount), payType === 'hr' ? 'hourly' : 'flat');
+        if (data) {
+          trackJobPosted(data.id, category, parseFloat(payAmount), payType === 'hr' ? 'hourly' : 'flat');
+          supabase.functions.invoke('notify-teens-nearby-job', { body: { job_id: data.id } }).catch(() => {});
+        }
         Alert.alert('Job Posted!', 'Teens near you can now see it.', [
           { text: 'OK', onPress: () => router.replace('/(tabs)' as any) },
         ]);

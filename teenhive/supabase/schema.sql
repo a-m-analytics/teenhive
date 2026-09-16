@@ -25,6 +25,7 @@ create table if not exists public.profiles (
   rating_count     integer     not null default 0,
   is_verified      boolean     not null default false,
   phone_verified   boolean     not null default false,
+  push_token       text,
   created_at       timestamptz not null default now()
 );
 

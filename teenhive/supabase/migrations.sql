@@ -184,3 +184,9 @@ grant execute on function public.init_profile(uuid, integer, text, text, numeric
 -- 21. Multi-location support: let a teen pick several locations they're
 --     willing to work in (in addition to/on top of their single home `neighborhood`).
 alter table profiles add column if not exists work_locations text[] default '{}';
+
+-- 22. Push token column — lib/pushService.ts has been calling
+--     supabase.from('profiles').update({ push_token }) since it was added,
+--     but this column never existed, so every push registration silently
+--     failed (caught by its try/catch) and no device has a token saved.
+alter table profiles add column if not exists push_token text;
