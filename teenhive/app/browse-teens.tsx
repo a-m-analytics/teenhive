@@ -1,12 +1,12 @@
 import EmptyState from '@/components/EmptyState';
-import LoadingScreen from '@/components/LoadingScreen';
+import CityPicker from '@/components/CityPicker';
 import { useAuth } from '@/context/AuthContext';
 import { ds, dsLabel, dsSecondaryLabel } from '@/lib/design';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 type Teen = {
   id: string;
@@ -54,19 +54,17 @@ export default function BrowseTeens() {
   const [sortBy, setSortBy] = useState<SortOption>('jobs');
   const [payFilter, setPayFilter] = useState<PayFilter>('any');
   const [neighborhood, setNeighborhood] = useState('');
-  const [neighborhoods, setNeighborhoods] = useState<{ name: string; count: number }[]>([]);
+  const [showCityPicker, setShowCityPicker] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [inviting, setInviting] = useState<string | null>(null);
   const [invited, setInvited] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchTeens();
-    fetchNeighborhoods();
   }, []);
 
   const fetchTeens = async () => {
     setLoading(true);
-    // Only show teens who have posted at least one active service
     const { data: serviceRows } = await supabase
       .from('teen_services')
       .select('teen_id')
@@ -82,20 +80,10 @@ export default function BrowseTeens() {
     setLoading(false);
   };
 
-  const fetchNeighborhoods = useCallback(async () => {
-    const { data } = await supabase.from('profiles').select('neighborhood').not('neighborhood', 'is', null);
-    if (!data) return;
-    const counts: Record<string, number> = {};
-    data.forEach((p: any) => { if (p.neighborhood) counts[p.neighborhood] = (counts[p.neighborhood] ?? 0) + 1; });
-    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
-    setNeighborhoods(sorted);
-  }, []);
-
   const handleInvite = async (teen: Teen) => {
     if (!user || !jobId) return;
     setInviting(teen.id);
     try {
-      // Check if already invited/applied
       const { data: existing } = await supabase
         .from('applications')
         .select('id, status')
@@ -174,274 +162,285 @@ export default function BrowseTeens() {
 
   return (
     <View style={{ flex: 1, backgroundColor: ds.c.bg }}>
-      {/* Header */}
-      <View style={{ paddingTop: 56, paddingHorizontal: 24, paddingBottom: 16 }}>
-        <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 16 }}>
-          <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: ds.c.secondary }}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={{ ...dsSecondaryLabel, marginBottom: 6 }}>
-          {jobTitle ? `For: ${decodeURIComponent(jobTitle)}` : 'Invite to job'}
-        </Text>
-        <Text style={{ fontFamily: ds.f.serifBold, fontSize: 32, color: ds.c.primary, letterSpacing: -0.5 }}>
-          Browse Teens
-        </Text>
-      </View>
-
-      {/* Search */}
-      <View style={{ paddingHorizontal: 24, marginBottom: 12 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: ds.c.surfaceContainerLow, borderRadius: 16, paddingHorizontal: 14, gap: 10 }}>
-          <Ionicons name="search-outline" size={18} color={ds.c.onSurfaceVariant} />
-          <TextInput
-            style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurface, paddingVertical: 14 }}
-            placeholder="Search by name, skill, or neighborhood..."
-            placeholderTextColor={ds.c.outlineVariant}
-            value={search}
-            onChangeText={setSearch}
-          />
-        </View>
-      </View>
-
-      {/* Neighbourhood quick chips */}
-      {neighborhoods.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 24, gap: 8, alignItems: 'center', paddingBottom: 8 }}
-          style={{ marginBottom: 4 }}
-        >
-          {neighborhoods.map(({ name, count }) => {
-            const active = neighborhood === name;
-            return (
-              <TouchableOpacity
-                key={name}
-                onPress={() => setNeighborhood(active ? '' : name)}
-                style={{
-                  flexDirection: 'row', alignItems: 'center', gap: 4,
-                  paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9999,
-                  backgroundColor: active ? ds.c.primary : ds.c.surfaceContainerLow,
-                  borderWidth: active ? 0 : 1, borderColor: ds.c.outlineVariant,
-                }}
-              >
-                <Ionicons name="location-outline" size={11} color={active ? ds.c.white : ds.c.onSurfaceVariant} />
-                <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 12, color: active ? ds.c.white : ds.c.onSurfaceVariant }}>
-                  {name} ({count})
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      )}
-
-      {/* Filter toggle row */}
-      <View style={{ flexDirection: 'row', paddingHorizontal: 24, marginBottom: 8, gap: 8, alignItems: 'center' }}>
-        <TouchableOpacity
-          onPress={() => setShowFilters(!showFilters)}
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9999, backgroundColor: hasActiveFilters ? ds.c.primary : ds.c.surfaceContainerLow }}
-        >
-          <Ionicons name="options-outline" size={14} color={hasActiveFilters ? ds.c.white : ds.c.onSurfaceVariant} />
-          <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: hasActiveFilters ? ds.c.white : ds.c.onSurfaceVariant }}>
-            {hasActiveFilters ? 'Filters applied' : 'Filters'}
-          </Text>
-        </TouchableOpacity>
-        {hasActiveFilters && (
-          <TouchableOpacity onPress={() => { setAgeFilter('any'); setSkillFilter('Any'); setPayFilter('any'); setSortBy('jobs'); setNeighborhood(''); }}>
-            <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ds.c.secondary }}>Clear all</Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
+        {/* Header */}
+        <View style={{ paddingTop: 56, paddingHorizontal: 24, paddingBottom: 16 }}>
+          <TouchableOpacity onPress={() => router.back()} style={{ marginBottom: 16 }}>
+            <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: ds.c.secondary }}>← Back</Text>
           </TouchableOpacity>
-        )}
-      </View>
+          {jobTitle ? (
+            <Text style={{ ...dsSecondaryLabel, marginBottom: 6 }}>
+              For: {decodeURIComponent(jobTitle)}
+            </Text>
+          ) : null}
+          <Text style={{ fontFamily: ds.f.serifBold, fontSize: 32, color: ds.c.primary, letterSpacing: -0.5 }}>
+            Browse Teens
+          </Text>
+        </View>
 
-      {showFilters && (
-        <View style={{ paddingHorizontal: 24, marginBottom: 14, gap: 16 }}>
-          {/* Age */}
-          <View>
-            <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: ds.c.onSurfaceVariant, letterSpacing: 1.2, marginBottom: 8 }}>AGE</Text>
-            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-              {AGE_FILTERS.map((f) => (
-                <TouchableOpacity
-                  key={f.value}
-                  onPress={() => setAgeFilter(f.value)}
-                  style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9999, backgroundColor: ageFilter === f.value ? ds.c.primary : ds.c.surfaceContainerLow, borderWidth: ageFilter === f.value ? 0 : 1, borderColor: ds.c.outlineVariant }}
-                >
-                  <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ageFilter === f.value ? ds.c.white : ds.c.onSurfaceVariant }}>{f.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+        {/* Trust banner */}
+        <View style={{ marginHorizontal: 24, marginBottom: 14, backgroundColor: ds.c.surfaceContainerLow, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <Ionicons name="shield-checkmark-outline" size={16} color={ds.c.secondary} />
+          <Text style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant, lineHeight: 17 }}>
+            Teen profiles are registered accounts. Always use your own judgement and meet safely.
+          </Text>
+        </View>
+
+        {/* Search */}
+        <View style={{ paddingHorizontal: 24, marginBottom: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: ds.c.surfaceContainerLow, borderRadius: 16, paddingHorizontal: 14, gap: 10 }}>
+            <Ionicons name="search-outline" size={18} color={ds.c.onSurfaceVariant} />
+            <TextInput
+              style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurface, paddingVertical: 14 }}
+              placeholder="Search by name, skill, or neighborhood..."
+              placeholderTextColor={ds.c.outlineVariant}
+              value={search}
+              onChangeText={setSearch}
+            />
           </View>
+        </View>
 
-          {/* Neighbourhood */}
-          {neighborhoods.length > 0 && (
+        {/* City quick filter chip */}
+        {neighborhood !== '' && (
+          <View style={{ paddingHorizontal: 24, marginBottom: 4 }}>
+            <TouchableOpacity
+              onPress={() => setNeighborhood('')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9999, backgroundColor: ds.c.primary }}
+            >
+              <Ionicons name="location" size={11} color={ds.c.white} />
+              <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 12, color: ds.c.white }}>{neighborhood}</Text>
+              <Ionicons name="close" size={11} color={ds.c.white} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Filter toggle row */}
+        <View style={{ flexDirection: 'row', paddingHorizontal: 24, marginBottom: 8, gap: 8, alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={() => setShowFilters(!showFilters)}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9999, backgroundColor: hasActiveFilters ? ds.c.primary : ds.c.surfaceContainerLow }}
+          >
+            <Ionicons name="options-outline" size={14} color={hasActiveFilters ? ds.c.white : ds.c.onSurfaceVariant} />
+            <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: hasActiveFilters ? ds.c.white : ds.c.onSurfaceVariant }}>
+              {hasActiveFilters ? 'Filters applied' : 'Filters'}
+            </Text>
+          </TouchableOpacity>
+          {hasActiveFilters && (
+            <TouchableOpacity onPress={() => { setAgeFilter('any'); setSkillFilter('Any'); setPayFilter('any'); setSortBy('jobs'); setNeighborhood(''); setShowFilters(false); }}>
+              <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ds.c.secondary }}>Clear all</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Filter panel */}
+        {showFilters && (
+          <View style={{ paddingHorizontal: 24, marginBottom: 14, gap: 16 }}>
+            {/* Age */}
             <View>
-              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: ds.c.onSurfaceVariant, letterSpacing: 1.2, marginBottom: 8 }}>NEIGHBOURHOOD</Text>
+              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: ds.c.onSurfaceVariant, letterSpacing: 1.2, marginBottom: 8 }}>AGE</Text>
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                {AGE_FILTERS.map((f) => (
+                  <TouchableOpacity
+                    key={f.value}
+                    onPress={() => setAgeFilter(f.value)}
+                    style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9999, backgroundColor: ageFilter === f.value ? ds.c.primary : ds.c.surfaceContainerLow, borderWidth: ageFilter === f.value ? 0 : 1, borderColor: ds.c.outlineVariant }}
+                  >
+                    <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ageFilter === f.value ? ds.c.white : ds.c.onSurfaceVariant }}>{f.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* City filter */}
+            <View>
+              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: ds.c.onSurfaceVariant, letterSpacing: 1.2, marginBottom: 8 }}>CITY</Text>
+              <TouchableOpacity
+                onPress={() => setShowCityPicker(true)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: neighborhood ? ds.c.primary : ds.c.surfaceContainerLow, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 13, borderWidth: neighborhood ? 0 : 1, borderColor: ds.c.outlineVariant }}
+              >
+                <Ionicons name="location-outline" size={15} color={neighborhood ? ds.c.white : ds.c.onSurfaceVariant} />
+                <Text style={{ flex: 1, fontFamily: ds.f.sansMedium, fontSize: 14, color: neighborhood ? ds.c.white : ds.c.onSurfaceVariant }}>
+                  {neighborhood || 'Any city'}
+                </Text>
+                {neighborhood ? (
+                  <TouchableOpacity onPress={() => setNeighborhood('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close-circle" size={16} color={ds.c.white} />
+                  </TouchableOpacity>
+                ) : (
+                  <Ionicons name="chevron-down" size={14} color={ds.c.onSurfaceVariant} />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* Skill/Category */}
+            <View>
+              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: ds.c.onSurfaceVariant, letterSpacing: 1.2, marginBottom: 8 }}>SKILL / CATEGORY</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                {neighborhoods.map(({ name, count }) => {
-                  const active = neighborhood === name;
-                  return (
-                    <TouchableOpacity
-                      key={name}
-                      onPress={() => setNeighborhood(active ? '' : name)}
-                      style={{
-                        flexDirection: 'row', alignItems: 'center', gap: 4,
-                        paddingHorizontal: 12, paddingVertical: 7, borderRadius: 9999,
-                        backgroundColor: active ? ds.c.primary : ds.c.surfaceContainerLow,
-                        borderWidth: active ? 0 : 1, borderColor: ds.c.outlineVariant,
-                      }}
-                    >
-                      <Ionicons name="location-outline" size={11} color={active ? ds.c.white : ds.c.onSurfaceVariant} />
-                      <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 12, color: active ? ds.c.white : ds.c.onSurfaceVariant }}>
-                        {name} ({count})
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                {SKILL_CATEGORIES.map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    onPress={() => setSkillFilter(cat)}
+                    style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9999, backgroundColor: skillFilter === cat ? ds.c.secondary : ds.c.surfaceContainerLow, borderWidth: skillFilter === cat ? 0 : 1, borderColor: ds.c.outlineVariant }}
+                  >
+                    <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: skillFilter === cat ? ds.c.white : ds.c.onSurfaceVariant }}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
               </ScrollView>
             </View>
-          )}
 
-          {/* Skill/Category */}
-          <View>
-            <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: ds.c.onSurfaceVariant, letterSpacing: 1.2, marginBottom: 8 }}>SKILL / CATEGORY</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-              {SKILL_CATEGORIES.map((cat) => (
-                <TouchableOpacity
-                  key={cat}
-                  onPress={() => setSkillFilter(cat)}
-                  style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9999, backgroundColor: skillFilter === cat ? ds.c.secondary : ds.c.surfaceContainerLow, borderWidth: skillFilter === cat ? 0 : 1, borderColor: ds.c.outlineVariant }}
-                >
-                  <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: skillFilter === cat ? ds.c.white : ds.c.onSurfaceVariant }}>{cat}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* Sort */}
-          <View>
-            <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: ds.c.onSurfaceVariant, letterSpacing: 1.2, marginBottom: 8 }}>SORT BY</Text>
-            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-              {SORT_OPTIONS.map((s) => (
-                <TouchableOpacity
-                  key={s.value}
-                  onPress={() => setSortBy(s.value)}
-                  style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9999, backgroundColor: sortBy === s.value ? ds.c.primaryContainer : ds.c.surfaceContainerLow, borderWidth: sortBy === s.value ? 0 : 1, borderColor: ds.c.outlineVariant }}
-                >
-                  <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: sortBy === s.value ? ds.c.white : ds.c.onSurfaceVariant }}>{s.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* Pay rate */}
-          <View>
-            <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: ds.c.onSurfaceVariant, letterSpacing: 1.2, marginBottom: 8 }}>HOURLY RATE</Text>
-            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-              {PAY_OPTIONS.map((p) => (
-                <TouchableOpacity
-                  key={p.value}
-                  onPress={() => setPayFilter(p.value)}
-                  style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9999, backgroundColor: payFilter === p.value ? ds.c.primaryContainer : ds.c.surfaceContainerLow, borderWidth: payFilter === p.value ? 0 : 1, borderColor: ds.c.outlineVariant }}
-                >
-                  <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: payFilter === p.value ? ds.c.white : ds.c.onSurfaceVariant }}>{p.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
-      )}
-
-      {loading ? (
-        <LoadingScreen />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon="people-outline"
-          title={teens.length === 0 ? 'No teens available yet' : 'No teens match your filters'}
-          subtitle={teens.length === 0 ? 'Teens who post their services will appear here' : 'Try adjusting your search or filters'}
-        />
-      ) : (
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
-          {filtered.map((teen) => {
-            const initials = getInitials(teen.full_name);
-            const isInvited = invited.has(teen.id);
-            const isInviting = inviting === teen.id;
-            return (
-              <View key={teen.id} style={{ backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 20, marginBottom: 12 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 }}>
-                  <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: ds.c.primaryContainer, justifyContent: 'center', alignItems: 'center', marginRight: 14 }}>
-                    <Text style={{ fontFamily: ds.f.sansBold, fontSize: 16, color: ds.c.white }}>{initials}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ fontFamily: ds.f.sansBold, fontSize: 15, color: ds.c.onSurface }}>
-                        {teen.full_name}{teen.age ? `, ${teen.age}` : ''}
-                      </Text>
-                      {teen.is_verified && (
-                        <Ionicons name="checkmark-circle" size={16} color={ds.c.secondary} />
-                      )}
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 3 }}>
-                      {teen.neighborhood ? (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                          <Ionicons name="location-outline" size={11} color={ds.c.onSurfaceVariant} />
-                          <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>{teen.neighborhood}</Text>
-                        </View>
-                      ) : null}
-                      {(teen.jobs_completed ?? 0) > 0 ? (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                          <Ionicons name="briefcase-outline" size={11} color={ds.c.onSurfaceVariant} />
-                          <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>{teen.jobs_completed} jobs done</Text>
-                        </View>
-                      ) : (
-                        <View style={{ backgroundColor: ds.c.secondaryContainer, borderRadius: 9999, paddingHorizontal: 8, paddingVertical: 2 }}>
-                          <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 11, color: ds.c.primary }}>New</Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                  {teen.hourly_rate ? (
-                    <View style={{ backgroundColor: ds.c.secondaryContainer, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 4 }}>
-                      <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: ds.c.primary }}>${teen.hourly_rate}/hr</Text>
-                    </View>
-                  ) : null}
-                </View>
-
-                {teen.bio ? (
-                  <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant, lineHeight: 19, marginBottom: 12 }} numberOfLines={2}>
-                    {teen.bio}
-                  </Text>
-                ) : null}
-
-                {teen.skills && teen.skills.length > 0 ? (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-                    {teen.skills.slice(0, 4).map((s) => (
-                      <View key={s} style={{ backgroundColor: ds.c.surfaceContainerHigh, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 4 }}>
-                        <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 12, color: ds.c.onSurfaceVariant }}>{s}</Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-
-                <View style={{ flexDirection: 'row', gap: 10 }}>
+            {/* Sort */}
+            <View>
+              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: ds.c.onSurfaceVariant, letterSpacing: 1.2, marginBottom: 8 }}>SORT BY</Text>
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                {SORT_OPTIONS.map((s) => (
                   <TouchableOpacity
-                    style={{ flex: 1, backgroundColor: ds.c.surfaceContainerHigh, borderRadius: 9999, paddingVertical: 12, alignItems: 'center' }}
-                    onPress={() => router.push(`/teen-profile?id=${teen.id}` as any)}
+                    key={s.value}
+                    onPress={() => setSortBy(s.value)}
+                    style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9999, backgroundColor: sortBy === s.value ? ds.c.primaryContainer : ds.c.surfaceContainerLow, borderWidth: sortBy === s.value ? 0 : 1, borderColor: ds.c.outlineVariant }}
                   >
-                    <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: ds.c.onSurface }}>View Profile</Text>
+                    <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: sortBy === s.value ? ds.c.white : ds.c.onSurfaceVariant }}>{s.label}</Text>
                   </TouchableOpacity>
-                  {jobId ? (
-                    <TouchableOpacity
-                      style={{ flex: 1, backgroundColor: isInvited ? ds.c.surfaceContainerHigh : ds.c.primary, borderRadius: 9999, paddingVertical: 12, alignItems: 'center', opacity: isInviting ? 0.5 : 1 }}
-                      onPress={() => !isInvited && handleInvite(teen)}
-                      disabled={isInvited || isInviting}
-                    >
-                      <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: isInvited ? ds.c.onSurfaceVariant : ds.c.white }}>
-                        {isInviting ? 'Inviting...' : isInvited ? 'Invited ✓' : 'Invite'}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
+                ))}
               </View>
-            );
-          })}
-        </ScrollView>
-      )}
+            </View>
+
+            {/* Pay rate */}
+            <View>
+              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: ds.c.onSurfaceVariant, letterSpacing: 1.2, marginBottom: 8 }}>HOURLY RATE</Text>
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                {PAY_OPTIONS.map((p) => (
+                  <TouchableOpacity
+                    key={p.value}
+                    onPress={() => setPayFilter(p.value)}
+                    style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9999, backgroundColor: payFilter === p.value ? ds.c.primaryContainer : ds.c.surfaceContainerLow, borderWidth: payFilter === p.value ? 0 : 1, borderColor: ds.c.outlineVariant }}
+                  >
+                    <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: payFilter === p.value ? ds.c.white : ds.c.onSurfaceVariant }}>{p.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Teens list */}
+        {loading ? (
+          <ActivityIndicator size="large" color={ds.c.secondary} style={{ marginTop: 48, marginBottom: 48 }} />
+        ) : filtered.length === 0 ? (
+          <EmptyState
+            icon="people-outline"
+            title={teens.length === 0 ? 'No teens available yet' : 'No teens match your filters'}
+            subtitle={teens.length === 0 ? 'Teens who post their services will appear here' : 'Try adjusting your search or filters'}
+          />
+        ) : (
+          <View style={{ paddingHorizontal: 24 }}>
+            {filtered.map((teen) => {
+              const initials = getInitials(teen.full_name);
+              const isInvited = invited.has(teen.id);
+              const isInviting = inviting === teen.id;
+              return (
+                <View key={teen.id} style={{ backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 20, marginBottom: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 }}>
+                    <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: ds.c.primaryContainer, justifyContent: 'center', alignItems: 'center', marginRight: 14 }}>
+                      <Text style={{ fontFamily: ds.f.sansBold, fontSize: 16, color: ds.c.white }}>{initials}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ fontFamily: ds.f.sansBold, fontSize: 15, color: ds.c.onSurface }}>
+                          {teen.full_name}{teen.age ? `, ${teen.age}` : ''}
+                        </Text>
+                        {teen.is_verified && (
+                          <Ionicons name="checkmark-circle" size={16} color={ds.c.secondary} />
+                        )}
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 3 }}>
+                        {teen.neighborhood ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                            <Ionicons name="location-outline" size={11} color={ds.c.onSurfaceVariant} />
+                            <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>{teen.neighborhood}</Text>
+                          </View>
+                        ) : null}
+                        {(teen.jobs_completed ?? 0) >= 10 ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                            <Ionicons name="briefcase-outline" size={11} color={ds.c.onSurfaceVariant} />
+                            <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>{teen.jobs_completed} jobs done 🏆</Text>
+                          </View>
+                        ) : (teen.jobs_completed ?? 0) >= 5 ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                            <Ionicons name="briefcase-outline" size={11} color={ds.c.onSurfaceVariant} />
+                            <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>{teen.jobs_completed} jobs done ⭐</Text>
+                          </View>
+                        ) : (teen.jobs_completed ?? 0) > 0 ? (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                            <Ionicons name="briefcase-outline" size={11} color={ds.c.onSurfaceVariant} />
+                            <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>{teen.jobs_completed} jobs done</Text>
+                          </View>
+                        ) : (
+                          <View style={{ backgroundColor: ds.c.secondaryContainer, borderRadius: 9999, paddingHorizontal: 8, paddingVertical: 2 }}>
+                            <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 11, color: ds.c.primary }}>New</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                    {teen.hourly_rate ? (
+                      <View style={{ backgroundColor: ds.c.secondaryContainer, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 4 }}>
+                        <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: ds.c.primary }}>${teen.hourly_rate}/hr</Text>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  {teen.bio ? (
+                    <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant, lineHeight: 19, marginBottom: 12 }} numberOfLines={2}>
+                      {teen.bio}
+                    </Text>
+                  ) : null}
+
+                  {teen.skills && teen.skills.length > 0 ? (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                      {teen.skills.slice(0, 4).map((s) => (
+                        <View key={s} style={{ backgroundColor: ds.c.surfaceContainerHigh, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 4 }}>
+                          <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 12, color: ds.c.onSurfaceVariant }}>{s}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
+
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <TouchableOpacity
+                      style={{ flex: 1, backgroundColor: ds.c.surfaceContainerHigh, borderRadius: 9999, paddingVertical: 12, alignItems: 'center' }}
+                      onPress={() => router.push(`/teen-profile?id=${teen.id}` as any)}
+                    >
+                      <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: ds.c.onSurface }}>View Profile</Text>
+                    </TouchableOpacity>
+                    {jobId ? (
+                      <TouchableOpacity
+                        style={{ flex: 1, backgroundColor: isInvited ? ds.c.surfaceContainerHigh : ds.c.primary, borderRadius: 9999, paddingVertical: 12, alignItems: 'center', opacity: isInviting ? 0.5 : 1 }}
+                        onPress={() => !isInvited && handleInvite(teen)}
+                        disabled={isInvited || isInviting}
+                      >
+                        <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: isInvited ? ds.c.onSurfaceVariant : ds.c.white }}>
+                          {isInviting ? 'Inviting...' : isInvited ? 'Invited ✓' : 'Invite'}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </ScrollView>
+
+      <CityPicker
+        visible={showCityPicker}
+        value={neighborhood}
+        onSelect={(city) => { setNeighborhood(city); setShowCityPicker(false); }}
+        onClose={() => setShowCityPicker(false)}
+      />
     </View>
   );
 }

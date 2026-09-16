@@ -1,7 +1,7 @@
 import EmptyState from '@/components/EmptyState';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useAuth } from '@/context/AuthContext';
-import { acceptApplication, completeJob, declineApplication } from '@/lib/applicationService';
+import { acceptApplication, requestJobCompletion, declineApplication } from '@/lib/applicationService';
 import { ds, dsSecondaryLabel } from '@/lib/design';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
@@ -108,7 +108,7 @@ export default function MyListingsTab() {
   if (!user || !isParent) return <LoadingScreen />;
 
   const active = listings.filter((l) => l.status === 'open');
-  const inProgress = listings.filter((l) => l.status === 'in_progress');
+  const inProgress = listings.filter((l) => l.status === 'in_progress' || l.status === 'pending_teen_confirmation' || l.status === 'disputed');
   const completed = listings.filter((l) => l.status === 'completed');
   const current = tab === 'Active' ? active : tab === 'In Progress' ? inProgress : completed;
 
@@ -166,38 +166,31 @@ export default function MyListingsTab() {
   }
 
   async function markComplete(listing: Listing) {
-    Alert.alert('Mark as Complete?', 'This will mark the job done and notify the teen.', [
+    if (listing.status === 'pending_teen_confirmation') {
+      Alert.alert('Waiting', 'Waiting for the teen to confirm this job is complete.');
+      return;
+    }
+    if (listing.status === 'disputed') {
+      Alert.alert('Dispute in Progress', "We've been notified and will reach out within 24 hours.");
+      return;
+    }
+    Alert.alert('Mark as Complete?', "The teen will need to confirm. We'll notify them now.", [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Mark Complete',
         onPress: async () => {
           const { data: app } = await supabase
             .from('applications')
-            .select('id, teen_id, teen:profiles!teen_id(full_name)')
+            .select('id, teen_id')
             .eq('job_id', listing.id)
             .eq('status', 'accepted')
             .maybeSingle();
 
-          if (app?.teen_id && app?.id) {
-            await completeJob(listing.id, app.id, app.teen_id);
-          }
-
-          fetchListings();
-
           if (app?.teen_id) {
-            const teenName = (app.teen as any)?.full_name ?? 'the teen';
-            Alert.alert(
-              'Job Complete!',
-              `Would you like to leave a review for ${teenName}?`,
-              [
-                { text: 'Later', style: 'cancel' },
-                {
-                  text: 'Leave Review',
-                  onPress: () => router.push(`/review-modal?jobId=${listing.id}&revieweeId=${app.teen_id}&jobTitle=${encodeURIComponent(listing.title)}` as any),
-                },
-              ]
-            );
+            await requestJobCompletion(listing.id, app.teen_id, user!.id, listing.title);
           }
+          fetchListings();
+          Alert.alert('Sent!', "We've notified the teen to confirm the job is complete.");
         },
       },
     ]);

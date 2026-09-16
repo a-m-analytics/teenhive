@@ -19,11 +19,28 @@ type Teen = {
   neighborhood: string | null; skills: string[]; availability: string[];
   hourly_rate: number | null; jobs_completed: number; trust_score: number;
   is_verified: boolean; avatar_url: string | null; rating: number | null; rating_count: number | null;
+  verified_skills: Record<string, number> | null;
+};
+
+// Maps skill display names → verified_skills keys
+const SKILL_TO_KEY: Record<string, string> = {
+  'Babysitting': 'babysitting',
+  'Tutoring': 'tutoring',
+  'Yard Work': 'yard_work',
+  'Lawn Mowing': 'yard_work',
+  'Pet Care': 'pet_sitting',
+  'Pet Sitting': 'pet_sitting',
+  'Tech Help': 'tech_help',
+  'Cleaning': 'cleaning',
+  'Errands': 'errands',
+  'Moving Help': 'moving_help',
+  'Cooking': 'cooking',
+  'Car Wash': 'car_wash',
 };
 
 type Review = {
   id: string; rating: number; comment: string | null; created_at: string;
-  reviewer: { full_name: string } | null;
+  reviewer: { full_name: string; neighborhood: string | null } | null;
 };
 
 function getInitials(name: string): string {
@@ -57,12 +74,17 @@ export default function TeenProfile() {
 
   useEffect(() => {
     if (!id) return;
-    supabase.from('profiles').select('id, full_name, age, bio, neighborhood, skills, availability, hourly_rate, jobs_completed, trust_score, is_verified, avatar_url, rating, rating_count').eq('id', id).single().then((teenRes) => {
+    supabase.from('profiles').select('id, full_name, age, bio, neighborhood, skills, availability, hourly_rate, jobs_completed, trust_score, is_verified, avatar_url, rating, rating_count, verified_skills').eq('id', id).single().then((teenRes) => {
       if (teenRes.data) setTeen(teenRes.data as Teen);
       setLoading(false);
       if (user && id && user.id !== id) trackProfileViewed(user.id, id, 'teen');
     });
-    getReviews(id).then(({ data }) => { if (data) setReviews(data as Review[]); });
+    supabase
+      .from('reviews')
+      .select('id, rating, comment, created_at, reviewer:profiles!reviewer_id(full_name, neighborhood)')
+      .eq('reviewee_id', id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => { if (data) setReviews(data as Review[]); });
   }, [id]);
 
   async function openInviteModal() {
@@ -199,8 +221,23 @@ export default function TeenProfile() {
           {/* Stats row */}
           <View style={{ marginBottom: 24 }}>
             <View style={{ backgroundColor: ds.c.primaryContainer, borderRadius: 20, padding: 16, alignItems: 'center' }}>
-              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 22, color: ds.c.secondaryContainer, letterSpacing: -0.3, marginBottom: 2 }}>{String(teen.jobs_completed)}</Text>
-              <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 11, color: 'rgba(243,251,244,0.6)', letterSpacing: 0.5 }}>Jobs Done</Text>
+              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 24, color: ds.c.secondaryContainer, letterSpacing: -0.3, marginBottom: 2 }}>
+                {teen.jobs_completed >= 10
+                  ? `${teen.jobs_completed} jobs done 🏆`
+                  : teen.jobs_completed >= 5
+                    ? `${teen.jobs_completed} jobs done ⭐`
+                    : teen.jobs_completed > 0
+                      ? `${teen.jobs_completed} jobs done`
+                      : 'New'}
+              </Text>
+              <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 11, color: 'rgba(243,251,244,0.6)', letterSpacing: 0.5 }}>
+                {teen.jobs_completed === 0 ? 'No jobs completed yet' : teen.jobs_completed === 1 ? '1 job completed' : `${teen.jobs_completed} jobs completed`}
+              </Text>
+              {teen.rating != null && teen.rating > 0 && (
+                <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ds.c.secondaryContainer, marginTop: 6 }}>
+                  ★ {teen.rating.toFixed(1)} avg rating · {teen.rating_count} {(teen.rating_count ?? 0) === 1 ? 'review' : 'reviews'}
+                </Text>
+              )}
             </View>
           </View>
 
@@ -219,12 +256,33 @@ export default function TeenProfile() {
                 <>
                   <Text style={{ ...dsSecondaryLabel, marginBottom: 12 }}>Skills</Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: teen.availability?.length > 0 ? 20 : 0 }}>
-                    {teen.skills.map((skill) => (
-                      <View key={skill} style={{ backgroundColor: ds.c.surfaceContainerHigh, borderRadius: 9999, paddingHorizontal: 14, paddingVertical: 7 }}>
-                        <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ds.c.onSurface }}>{skill}</Text>
-                      </View>
-                    ))}
+                    {teen.skills.map((skill) => {
+                      const verifiedCount = teen.verified_skills?.[SKILL_TO_KEY[skill] ?? ''] ?? 0;
+                      const verified = verifiedCount > 0;
+                      return (
+                        <View key={skill} style={{
+                          backgroundColor: verified ? '#dcfce7' : ds.c.surfaceContainerHigh,
+                          borderRadius: 9999, paddingHorizontal: 12, paddingVertical: 7,
+                          flexDirection: 'row', alignItems: 'center', gap: 5,
+                          borderWidth: verified ? 1 : 0, borderColor: '#bbf7d0',
+                        }}>
+                          {verified && <Ionicons name="checkmark-circle" size={13} color="#16a34a" />}
+                          <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: verified ? '#065f46' : ds.c.onSurface }}>
+                            {skill}
+                          </Text>
+                          {verified && (
+                            <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: '#16a34a' }}>×{verifiedCount}</Text>
+                          )}
+                        </View>
+                      );
+                    })}
                   </View>
+                  {teen.verified_skills && Object.values(teen.verified_skills).some((v) => v > 0) && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 }}>
+                      <Ionicons name="checkmark-circle" size={12} color="#16a34a" />
+                      <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#16a34a' }}>Green = verified by completed jobs</Text>
+                    </View>
+                  )}
                 </>
               )}
               {teen.availability && teen.availability.length > 0 && (
@@ -263,14 +321,16 @@ export default function TeenProfile() {
               </View>
             ) : (
               reviews.map((r) => {
-                const firstName = (r.reviewer?.full_name ?? 'Parent').split(' ')[0];
-                const date = new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const reviewerLabel = r.reviewer?.neighborhood
+                  ? `Parent in ${r.reviewer.neighborhood}`
+                  : 'Parent';
+                const date = new Date(r.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
                 return (
                   <View key={r.id} style={{ backgroundColor: ds.c.surfaceContainerLow, borderRadius: 18, padding: 18, marginBottom: 10 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: ds.c.primary }}>{firstName}</Text>
-                        <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>{date}</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                      <View style={{ flex: 1, marginRight: 10 }}>
+                        <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ds.c.primary }}>{reviewerLabel}</Text>
+                        <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant, marginTop: 1 }}>{date}</Text>
                       </View>
                       <View style={{ flexDirection: 'row', gap: 1 }}>
                         {[1,2,3,4,5].map((n) => (

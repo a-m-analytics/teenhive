@@ -23,7 +23,7 @@ SplashScreen.preventAutoHideAsync();
 
 // Handles all auth-based redirects in one place.
 // Runs at the root so it only fires once regardless of which screen is mounted.
-const SKIP_AVATAR_SCREENS = new Set(['welcome', 'login', 'signup', 'verify-email', 'how-it-works', 'complete-profile', 'onboarding', 'terms', 'privacy']);
+const SKIP_AVATAR_SCREENS = new Set(['welcome', 'login', 'signup', 'verify-email', 'how-it-works', 'complete-profile', 'onboarding', 'terms', 'privacy', 'account-suspended']);
 
 function AuthGate() {
   const { user, profile, loading } = useAuth();
@@ -39,6 +39,14 @@ function AuthGate() {
     if (!user && inTabs) {
       router.replace('/welcome');
       return;
+    }
+
+    // Account status gating — check before anything else for logged-in users
+    if (user && profile) {
+      if (profile.account_status === 'suspended' && currentScreen !== 'account-suspended') {
+        router.replace('/account-suspended');
+        return;
+      }
     }
 
     // Require profile pic before accessing the app
@@ -99,8 +107,10 @@ function RootLayoutNav({ fontsLoaded }: { fontsLoaded: boolean }) {
         <Stack.Screen name="verify-email" />
         <Stack.Screen name="how-it-works" />
         <Stack.Screen name="complete-profile" />
+        <Stack.Screen name="account-suspended" options={{ gestureEnabled: false }} />
         <Stack.Screen name="review-modal" options={{ presentation: 'modal' }} />
         <Stack.Screen name="browse-guest" />
+        <Stack.Screen name="community" />
       </Stack>
       <StatusBar style="dark" />
     </>

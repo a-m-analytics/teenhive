@@ -17,11 +17,13 @@ import {
 
 type Job = {
   id: string; title: string; category: string; description: string;
-  pay_rate: number; pay_type: 'hourly' | 'flat'; location_area: string;
+  pay_rate: number | null; pay_type: 'hourly' | 'flat'; location_area: string;
   date: string | null; start_time: string | null; estimated_hours: number | null;
   is_recurring: boolean; recurring_days: string[] | null; frequency: string | null;
+  job_type: 'paid' | 'community' | 'quick' | null;
+  organization: string | null;
   parent_id: string;
-  parent: { id: string; full_name: string; is_verified: boolean };
+  parent: { id: string; full_name: string; is_verified: boolean; neighborhood: string | null };
 };
 
 function getInitials(name: string) {
@@ -172,7 +174,9 @@ export default function JobDetail() {
     );
   }
 
-  const pay = `$${job.pay_rate}${job.pay_type === 'hourly' ? '/hr' : ' flat'}`;
+  const pay = job.pay_rate != null
+    ? `$${job.pay_rate}${job.pay_type === 'hourly' ? '/hr' : ' flat'}`
+    : job.job_type === 'community' ? 'Volunteer' : 'Unpaid';
   const userInitials = profile?.full_name ? getInitials(profile.full_name) : '?';
   const parentInitials = getInitials(job.parent.full_name);
 
@@ -200,9 +204,21 @@ export default function JobDetail() {
             )}
           </View>
 
-          {/* Category label */}
-          <View style={{ backgroundColor: ds.c.secondaryContainer, alignSelf: 'flex-start', borderRadius: 9999, paddingHorizontal: 12, paddingVertical: 5, marginBottom: 16 }}>
-            <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.primary }}>{job.category}</Text>
+          {/* Category + type badges */}
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+            <View style={{ backgroundColor: ds.c.secondaryContainer, borderRadius: 9999, paddingHorizontal: 12, paddingVertical: 5 }}>
+              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.primary }}>{job.category}</Text>
+            </View>
+            {job.job_type === 'community' && (
+              <View style={{ backgroundColor: '#dcfce7', borderRadius: 9999, paddingHorizontal: 12, paddingVertical: 5 }}>
+                <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: '#065f46' }}>💚 Community</Text>
+              </View>
+            )}
+            {job.job_type === 'quick' && (
+              <View style={{ backgroundColor: '#fef9c3', borderRadius: 9999, paddingHorizontal: 12, paddingVertical: 5 }}>
+                <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: '#713f12' }}>⚡ Quick</Text>
+              </View>
+            )}
           </View>
 
           {/* Title */}
@@ -237,6 +253,9 @@ export default function JobDetail() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontFamily: ds.f.sansBold, fontSize: 15, color: ds.c.onSurface, marginBottom: 2 }}>{job.parent.full_name}</Text>
+              {job.parent.neighborhood ? (
+                <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant, marginBottom: 2 }}>{job.parent.neighborhood}</Text>
+              ) : null}
               {job.parent.is_verified && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Ionicons name="shield-checkmark" size={12} color={ds.c.secondary} />
@@ -293,6 +312,19 @@ export default function JobDetail() {
               <View>
                 <Text style={{ fontFamily: ds.f.sans, fontSize: 11, color: ds.c.onSurfaceVariant }}>Location</Text>
                 <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: ds.c.onSurface }}>{job.location_area}</Text>
+              </View>
+            </View>
+          ) : null}
+
+          {/* Organization row — community jobs only */}
+          {job.organization ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#f0fdf4', borderRadius: 20, padding: 16, gap: 12, marginBottom: 12, borderWidth: 1, borderColor: '#bbf7d0' }}>
+              <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#dcfce7', justifyContent: 'center', alignItems: 'center' }}>
+                <Ionicons name="business-outline" size={18} color="#16a34a" />
+              </View>
+              <View>
+                <Text style={{ fontFamily: ds.f.sans, fontSize: 11, color: '#16a34a' }}>Organisation</Text>
+                <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: '#065f46' }}>{job.organization}</Text>
               </View>
             </View>
           ) : null}

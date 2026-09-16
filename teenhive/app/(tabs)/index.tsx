@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import GradientButton from '@/components/GradientButton';
 import PressableScale from '@/components/PressableScale';
 import ServiceCard, { ServiceCardData } from '@/components/ServiceCard';
@@ -42,6 +43,17 @@ function formatDate(dateStr: string): string {
   } catch { return ''; }
 }
 
+function timeAgo(dateStr: string): string {
+  try {
+    const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+    return formatDate(dateStr);
+  } catch { return ''; }
+}
+
 // ─── Teen Home ────────────────────────────────────────────────────────────────
 function TeenHome() {
   const { user, profile } = useAuth();
@@ -58,8 +70,15 @@ function TeenHome() {
   const [payFilterIdx, setPayFilterIdx] = useState(0);
   const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
+  const [safetyTipsDismissed, setSafetyTipsDismissed] = useState(true);
 
   const firstName = profile?.full_name?.split(' ')[0] ?? 'there';
+
+  useEffect(() => {
+    AsyncStorage.getItem('safety_tips_dismissed').then((val) => {
+      if (!val) setSafetyTipsDismissed(false);
+    });
+  }, []);
 
   const fetchJobs = useCallback(async (search: string, category: string, minPay: number | null) => {
     setLoadingJobs(true);
@@ -70,7 +89,8 @@ function TeenHome() {
     if (category !== 'All') query = query.eq('category', category);
     if (search.trim()) query = query.ilike('title', `%${search.trim()}%`);
     if (minPay != null) query = query.gte('pay_rate', minPay);
-    const { data, error } = await query.order('created_at', { ascending: false });
+    query = query.neq('job_type', 'community');
+    const { data, error } = await query.order('created_at', { ascending: false }).limit(3);
     if (!error && data) setJobs(data);
     setLoadingJobs(false);
   }, []);
@@ -166,6 +186,23 @@ function TeenHome() {
           <Text style={{ flex: 1, fontFamily: ds.f.sansMedium, fontSize: 13, color: ds.c.primary }}>Found a bug or have feedback? Tap here →</Text>
         </TouchableOpacity>
 
+        {/* Safety tips card — first-time only */}
+        {!safetyTipsDismissed && (
+          <View style={{ marginHorizontal: 24, marginBottom: 20, backgroundColor: '#735c00', borderRadius: 16, padding: 18 }}>
+            <Text style={{ fontFamily: ds.f.sansBold, fontSize: 14, color: '#fff', marginBottom: 10 }}>Stay safe on Teen Hive</Text>
+            <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: '#fef3c7', lineHeight: 21, marginBottom: 14 }}>
+              {'✓ '} Always tell a parent where you're going.{'\n'}
+              {'✓ '} Never share your personal phone number or address in chat.{'\n'}
+              {'✓ '} If anything feels wrong, report it immediately.
+            </Text>
+            <TouchableOpacity
+              onPress={async () => { await AsyncStorage.setItem('safety_tips_dismissed', '1'); setSafetyTipsDismissed(true); }}
+              style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 9999, paddingVertical: 10, alignItems: 'center' }}
+            >
+              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: '#fff' }}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* ── Bento action cards ── */}
         <View style={{ paddingHorizontal: 24, marginBottom: 24, gap: 12 }}>
@@ -183,15 +220,15 @@ function TeenHome() {
 
           {/* Secondary cards — full width stacked */}
           <PressableScale
-            style={{ backgroundColor: ds.c.surfaceContainerLow, borderRadius: 24, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}
-            onPress={() => router.push('/(tabs)/jobs' as any)}
+            style={{ backgroundColor: '#f0fdf4', borderRadius: 24, padding: 20, flexDirection: 'row', alignItems: 'center', gap: 16, borderWidth: 1, borderColor: '#bbf7d0' }}
+            onPress={() => router.push('/community' as any)}
           >
-            <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: ds.c.secondaryContainer, justifyContent: 'center', alignItems: 'center' }}>
-              <Ionicons name="briefcase-outline" size={22} color={ds.c.primary} />
+            <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#dcfce7', justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ fontSize: 22 }}>💚</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 17, color: ds.c.primary, letterSpacing: -0.2 }}>My Applications</Text>
-              <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant, marginTop: 2 }}>Track applied, active & completed</Text>
+              <Text style={{ fontFamily: ds.f.serifBold, fontSize: 17, color: ds.c.primary, letterSpacing: -0.2 }}>Community</Text>
+              <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: ds.c.onSurfaceVariant, marginTop: 2 }}>Volunteer & local opportunities</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={ds.c.outlineVariant} />
           </PressableScale>
@@ -214,7 +251,7 @@ function TeenHome() {
         {/* ── Top Categories ── */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, marginBottom: 14 }}>
           <Text style={{ fontFamily: ds.f.serifBold, fontSize: 22, color: ds.c.primary, letterSpacing: -0.3 }}>Top Categories</Text>
-          <TouchableOpacity onPress={() => setSelectedCategory('All')}>
+          <TouchableOpacity onPress={() => router.push('/browse-jobs' as any)}>
             <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ds.c.secondary }}>See All</Text>
           </TouchableOpacity>
         </View>
@@ -242,9 +279,9 @@ function TeenHome() {
         {/* ── Jobs list ── */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, marginBottom: 16 }}>
           <Text style={{ fontFamily: ds.f.serifBold, fontSize: 22, color: ds.c.primary, letterSpacing: -0.3 }}>Jobs Near You</Text>
-          {!loadingJobs && (
-            <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 13, color: ds.c.onSurfaceVariant }}>{visibleJobs.length} found</Text>
-          )}
+          <TouchableOpacity onPress={() => router.push('/browse-jobs' as any)}>
+            <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ds.c.secondary }}>See all</Text>
+          </TouchableOpacity>
         </View>
 
         {hasActiveFilters && (
@@ -305,16 +342,27 @@ function TeenHome() {
               </Text>
 
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+                {job.is_quick && (
+                  <View style={{ backgroundColor: '#fef9c3', borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <Text style={{ fontSize: 10 }}>⚡</Text>
+                    <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, color: '#713f12' }}>Quick</Text>
+                  </View>
+                )}
                 <View style={{ backgroundColor: ds.c.surfaceContainerHigh, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 4 }}>
                   <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 12, color: ds.c.onSurfaceVariant }}>{job.category}</Text>
                 </View>
-                <View style={{ backgroundColor: ds.c.secondaryContainer, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 4 }}>
-                  <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.primary }}>
-                    ${job.pay_rate}{job.pay_type === 'hourly' ? '/hr' : ' flat'}
-                  </Text>
-                </View>
+                {job.pay_rate != null && (
+                  <View style={{ backgroundColor: ds.c.secondaryContainer, borderRadius: 9999, paddingHorizontal: 10, paddingVertical: 4 }}>
+                    <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.primary }}>
+                      ${job.pay_rate}{job.pay_type === 'hourly' ? '/hr' : ' flat'}
+                    </Text>
+                  </View>
+                )}
                 {job.location_area ? <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 12, color: ds.c.onSurfaceVariant }}>{job.location_area}</Text> : null}
                 {job.date ? <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 12, color: ds.c.onSurfaceVariant }}>{formatDate(job.date)}</Text> : null}
+                {job.created_at ? (
+                  <Text style={{ fontFamily: ds.f.sans, fontSize: 11, color: ds.c.outlineVariant }}>{timeAgo(job.created_at)}</Text>
+                ) : null}
               </View>
 
               <View style={{ backgroundColor: ds.c.primary, borderRadius: 9999, paddingVertical: 13, alignItems: 'center' }}>
@@ -322,6 +370,16 @@ function TeenHome() {
               </View>
             </PressableScale>
           ))
+        )}
+
+        {/* See all jobs CTA */}
+        {!loadingJobs && visibleJobs.length > 0 && (
+          <TouchableOpacity
+            onPress={() => router.push('/browse-jobs' as any)}
+            style={{ marginHorizontal: 24, marginBottom: 28, borderWidth: 1.5, borderColor: ds.c.outlineVariant, borderRadius: 9999, paddingVertical: 13, alignItems: 'center' }}
+          >
+            <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 14, color: ds.c.onSurface }}>See all jobs →</Text>
+          </TouchableOpacity>
         )}
 
         {/* ── Teens offering services ── */}
@@ -385,8 +443,15 @@ function ParentHome() {
   const [invitedTeens, setInvitedTeens] = useState<Set<string>>(new Set());
   const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
   const [unreadCount, setUnreadCount] = useState(0);
+  const [safetyTipsDismissed, setSafetyTipsDismissed] = useState(true);
 
   const firstName = profile?.full_name?.split(' ')[0] ?? 'there';
+
+  useEffect(() => {
+    AsyncStorage.getItem('safety_tips_dismissed').then((val) => {
+      if (!val) setSafetyTipsDismissed(false);
+    });
+  }, []);
 
   const fetchData = useCallback(async () => {
     if (!user) return;
@@ -497,6 +562,24 @@ function ParentHome() {
         <Text style={{ fontFamily: ds.f.sansBold, fontSize: 11, letterSpacing: 1, backgroundColor: ds.c.primary, color: ds.c.secondaryContainer, borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 }}>BETA</Text>
         <Text style={{ flex: 1, fontFamily: ds.f.sansMedium, fontSize: 13, color: ds.c.primary }}>Found a bug or have feedback? Tap here →</Text>
       </TouchableOpacity>
+
+      {/* Safety tips card — first-time only */}
+      {!safetyTipsDismissed && (
+        <View style={{ marginHorizontal: 24, marginBottom: 20, backgroundColor: '#735c00', borderRadius: 16, padding: 18 }}>
+          <Text style={{ fontFamily: ds.f.sansBold, fontSize: 14, color: '#fff', marginBottom: 10 }}>Stay safe on Teen Hive</Text>
+          <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: '#fef3c7', lineHeight: 21, marginBottom: 14 }}>
+            {'✓ '} Always video call before the first meeting.{'\n'}
+            {'✓ '} Read reviews carefully before hiring.{'\n'}
+            {'✓ '} All communication should stay in-app until you're comfortable.
+          </Text>
+          <TouchableOpacity
+            onPress={async () => { await AsyncStorage.setItem('safety_tips_dismissed', '1'); setSafetyTipsDismissed(true); }}
+            style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 9999, paddingVertical: 10, alignItems: 'center' }}
+          >
+            <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: '#fff' }}>Got it</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Action cards */}
       <View style={{ paddingHorizontal: 24, marginBottom: 28, gap: 12 }}>

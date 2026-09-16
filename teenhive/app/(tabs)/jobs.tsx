@@ -2,7 +2,7 @@ import EmptyState from '@/components/EmptyState';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useAuth } from '@/context/AuthContext';
 import { ds, dsLabel, dsSecondaryLabel } from '@/lib/design';
-import { acceptApplication, declineApplication, completeJob } from '@/lib/applicationService';
+import { acceptApplication, declineApplication, requestJobCompletion, confirmJobCompletion, disputeJob } from '@/lib/applicationService';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -164,7 +164,7 @@ function TeenJobs() {
     setLoading(true);
     const { data } = await supabase
       .from('applications')
-      .select('id, status, created_at, message, job:jobs(id, title, category, pay_rate, pay_type, date, description, parent_id, parent:profiles!parent_id(id, full_name))')
+      .select('id, status, created_at, message, job:jobs(id, title, category, pay_rate, pay_type, date, description, parent_id, status, parent:profiles!parent_id(id, full_name))')
       .eq('teen_id', user.id)
       .order('created_at', { ascending: false });
     if (data) setApps(data as unknown as any[]);
@@ -176,7 +176,8 @@ function TeenJobs() {
   // Invites are shown separately at the top — not mixed into Applied tab
   const invites = apps.filter((a) => a.status === 'invited');
   const applied = apps.filter((a) => a.status === 'pending');
-  const active = apps.filter((a) => a.status === 'accepted');
+  const active = apps.filter((a) => a.status === 'accepted' || (a.job as any)?.status === 'pending_teen_confirmation');
+  const pendingConfirmation = apps.filter((a) => (a.job as any)?.status === 'pending_teen_confirmation');
   const completed = apps.filter((a) => a.status === 'completed');
   const current = tab === 'Applied' ? applied : tab === 'Active' ? active : completed;
 
@@ -247,6 +248,57 @@ function TeenJobs() {
         },
       },
     ]);
+  }
+
+  async function handleConfirmComplete(app: any) {
+    const job = app.job;
+    if (!job || !user) return;
+    Alert.alert('Confirm Job Complete?', 'Confirm that this job is finished?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Yes, job is done ✓',
+        onPress: async () => {
+          setActioning(app.id);
+          try {
+            await confirmJobCompletion(job.id, app.id, user.id, job.parent_id, job.title);
+            await fetchApps();
+            Alert.alert('Job Complete!', 'Great work! Check your profile to see your updated job count.');
+          } catch (e: any) {
+            Alert.alert('Error', e.message ?? 'Could not confirm completion.');
+          } finally {
+            setActioning(null);
+          }
+        },
+      },
+    ]);
+  }
+
+  async function handleDisputeJob(app: any) {
+    const job = app.job;
+    if (!job || !user) return;
+    Alert.alert(
+      'Report an Issue',
+      "If the job isn't complete yet or there's a problem, we'll be notified and reach out within 24 hours.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'No, there\'s an issue',
+          style: 'destructive',
+          onPress: async () => {
+            setActioning(app.id);
+            try {
+              await disputeJob(job.id, user.id, job.parent_id, job.title);
+              await fetchApps();
+              Alert.alert("We've been notified", 'We will reach out within 24 hours.');
+            } catch (e: any) {
+              Alert.alert('Error', e.message ?? 'Could not submit dispute.');
+            } finally {
+              setActioning(null);
+            }
+          },
+        },
+      ]
+    );
   }
 
   return (
@@ -370,7 +422,32 @@ function TeenJobs() {
                 <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant }}>Applied {formatDate(a.created_at)}</Text>
               </View>
 
-              {a.status === 'accepted' && (
+              {/* Pending confirmation banner — parent marked complete, teen must confirm */}
+              {(a.job as any)?.status === 'pending_teen_confirmation' && (
+                <View style={{ backgroundColor: '#fef3c7', borderRadius: 16, padding: 14, marginTop: 4, borderWidth: 1.5, borderColor: '#f59e0b' }}>
+                  <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: '#92400e', marginBottom: 10 }}>
+                    Your parent marked this job complete — can you confirm?
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity
+                      style={{ flex: 1, backgroundColor: ds.c.primary, borderRadius: 9999, paddingVertical: 10, alignItems: 'center', opacity: actioning === a.id ? 0.5 : 1 }}
+                      onPress={() => handleConfirmComplete(a)}
+                      disabled={actioning === a.id}
+                    >
+                      <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: ds.c.white }}>Yes, job is done ✓</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ flex: 1, borderWidth: 1.5, borderColor: '#ef4444', borderRadius: 9999, paddingVertical: 10, alignItems: 'center', opacity: actioning === a.id ? 0.5 : 1 }}
+                      onPress={() => handleDisputeJob(a)}
+                      disabled={actioning === a.id}
+                    >
+                      <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: '#ef4444' }}>No, there's an issue</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {a.status === 'accepted' && (a.job as any)?.status !== 'pending_teen_confirmation' && (
                 <TouchableOpacity
                   style={{ borderRadius: 9999, borderWidth: 1.5, borderColor: ds.c.primary, paddingVertical: 11, alignItems: 'center' }}
                   onPress={() => router.push(`/chat?id=${job.parent?.id ?? ''}&name=${encodeURIComponent(job.parent?.full_name ?? '')}` as any)}
@@ -438,7 +515,7 @@ function ParentJobs() {
   useFocusEffect(useCallback(() => { fetchListings(); }, [fetchListings]));
 
   const active = listings.filter((l) => l.status === 'open');
-  const inProgress = listings.filter((l) => l.status === 'in_progress');
+  const inProgress = listings.filter((l) => l.status === 'in_progress' || l.status === 'pending_teen_confirmation' || l.status === 'disputed');
   const completed = listings.filter((l) => l.status === 'completed');
   const current = tab === 'Active' ? active : tab === 'In Progress' ? inProgress : completed;
 
@@ -473,7 +550,15 @@ function ParentJobs() {
   }
 
   async function markComplete(listing: any) {
-    Alert.alert('Mark as Complete?', `Mark "${listing.title}" as done?`, [
+    if (listing.status === 'pending_teen_confirmation') {
+      Alert.alert('Waiting', 'Waiting for the teen to confirm this job is complete.');
+      return;
+    }
+    if (listing.status === 'disputed') {
+      Alert.alert('Dispute in Progress', "We've been notified and will reach out within 24 hours.");
+      return;
+    }
+    Alert.alert('Mark as Complete?', `The teen will need to confirm. Mark "${listing.title}" as done?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Mark Complete',
@@ -485,12 +570,11 @@ function ParentJobs() {
             .eq('status', 'accepted')
             .maybeSingle();
 
-          if (app?.teen_id && app?.id) {
-            await completeJob(listing.id, app.id, app.teen_id);
+          if (app?.teen_id) {
+            await requestJobCompletion(listing.id, app.teen_id, user!.id, listing.title);
           }
           await fetchListings();
-
-          Alert.alert('Job Complete!', 'Great work — the job has been marked as done.');
+          Alert.alert('Sent!', "We've notified the teen to confirm the job is complete.");
         },
       },
     ]);
@@ -630,6 +714,22 @@ function ParentJobs() {
               {/* In Progress: show accepted teen + message + mark complete */}
               {tab === 'In Progress' && (
                 <View style={{ gap: 10 }}>
+                  {/* Status banners */}
+                  {listing.status === 'pending_teen_confirmation' && (
+                    <View style={{ backgroundColor: '#fef3c7', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#f59e0b' }}>
+                      <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: '#92400e' }}>
+                        Waiting for teen to confirm completion...
+                      </Text>
+                    </View>
+                  )}
+                  {listing.status === 'disputed' && (
+                    <View style={{ backgroundColor: '#fee2e2', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#ef4444' }}>
+                      <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: '#991b1b' }}>
+                        Dispute in progress — we'll reach out within 24 hours.
+                      </Text>
+                    </View>
+                  )}
+
                   {acceptedTeen && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                       <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: ds.c.secondaryContainer, justifyContent: 'center', alignItems: 'center' }}>
@@ -653,12 +753,14 @@ function ParentJobs() {
                         <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: ds.c.onSurface }}>Message</Text>
                       </TouchableOpacity>
                     )}
-                    <TouchableOpacity
-                      style={{ flex: 1, borderRadius: 9999, backgroundColor: ds.c.primary, paddingVertical: 13, alignItems: 'center' }}
-                      onPress={() => markComplete(listing)}
-                    >
-                      <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: ds.c.white, letterSpacing: 0.5 }}>Mark Complete</Text>
-                    </TouchableOpacity>
+                    {listing.status === 'in_progress' && (
+                      <TouchableOpacity
+                        style={{ flex: 1, borderRadius: 9999, backgroundColor: ds.c.primary, paddingVertical: 13, alignItems: 'center' }}
+                        onPress={() => markComplete(listing)}
+                      >
+                        <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: ds.c.white, letterSpacing: 0.5 }}>Mark Complete</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               )}

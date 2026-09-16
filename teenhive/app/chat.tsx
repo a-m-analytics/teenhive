@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import OfflineBanner from '@/components/OfflineBanner';
 import { useAuth } from '@/context/AuthContext';
 import { trackMessageSent } from '@/lib/analytics';
@@ -44,6 +45,20 @@ const REPORT_REASONS: { key: ReportReason; label: string }[] = [
   { key: 'other', label: 'Other' },
 ];
 
+const TEEN_SAFETY_TIPS = [
+  'Video call or phone call first — get to know them',
+  'Tell a parent exactly where you\'re going and when you\'ll be back',
+  'Meet somewhere visible, not inside a house on the first meeting',
+  'Trust your gut — it\'s always okay to cancel',
+];
+
+const PARENT_SAFETY_TIPS = [
+  'Video call or phone call with the teen first',
+  'Make sure their parent knows they are coming',
+  'First meeting should be brief and in a visible area',
+  'Read their profile and reviews carefully',
+];
+
 export default function Chat() {
   const { id, name } = useLocalSearchParams<{ id: string; name: string }>();
   const router = useRouter();
@@ -51,7 +66,9 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
-  const [bannerDismissed, setBannerDismissed] = useState(false);
+  const [safetyBannerDismissed, setSafetyBannerDismissed] = useState(true); // default hidden until loaded
+  const [safetyCode, setSafetyCode] = useState<string | null>(null);
+  const [applicationId, setApplicationId] = useState<string | null>(null);
   const [reportModal, setReportModal] = useState(false);
   const [reportReason, setReportReason] = useState<ReportReason | ''>('');
   const [reportDescription, setReportDescription] = useState('');
@@ -59,11 +76,40 @@ export default function Chat() {
   const flatListRef = useRef<FlatList>(null);
   const otherName = decodeURIComponent(name ?? 'User');
   const otherUserId = id ?? '';
+  const isTeen = profile?.role === 'teen';
+
+  // Fetch active application between the two users to get safety code + banner state
+  useEffect(() => {
+    if (!user || !otherUserId) return;
+    supabase
+      .from('applications')
+      .select('id, safety_code, job_id')
+      .or(
+        `and(teen_id.eq.${user.id},parent_id.eq.${otherUserId}),and(teen_id.eq.${otherUserId},parent_id.eq.${user.id})`
+      )
+      .in('status', ['accepted', 'completed', 'pending_teen_confirmation'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(async ({ data }) => {
+        if (!data) return;
+        if (data.safety_code) setSafetyCode(data.safety_code);
+        setApplicationId(data.id);
+        const dismissed = await AsyncStorage.getItem(`safety_banner_dismissed_${data.id}`);
+        setSafetyBannerDismissed(!!dismissed);
+      });
+  }, [user, otherUserId]);
+
+  const dismissSafetyBanner = async () => {
+    if (applicationId) {
+      await AsyncStorage.setItem(`safety_banner_dismissed_${applicationId}`, '1');
+    }
+    setSafetyBannerDismissed(true);
+  };
 
   useEffect(() => {
     if (!user || !otherUserId) return;
 
-    // Fetch existing messages
     supabase
       .from('messages')
       .select('id, sender_id, receiver_id, content, created_at, read, job_id')
@@ -74,10 +120,8 @@ export default function Chat() {
         setLoading(false);
       });
 
-    // Mark incoming messages as read
     supabase.from('messages').update({ read: true }).eq('sender_id', otherUserId).eq('receiver_id', user.id);
 
-    // Real-time subscription — listen for all new messages in this conversation
     const channel = supabase
       .channel(`chat-${user.id}-${otherUserId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
@@ -87,7 +131,6 @@ export default function Chat() {
           (msg.sender_id === otherUserId && msg.receiver_id === user.id)
         ) {
           setMessages((prev) => prev.some(m => m.id === msg.id) ? prev : [...prev, msg]);
-          // Mark as read if incoming
           if (msg.sender_id === otherUserId) {
             supabase.from('messages').update({ read: true }).eq('id', msg.id);
           }
@@ -114,7 +157,6 @@ export default function Chat() {
       content,
       read: false,
     }).select().single();
-    // Optimistically append — realtime may not fire for the sender
     if (data) {
       setMessages(prev => prev.some(m => m.id === (data as Message).id) ? prev : [...prev, data as Message]);
     }
@@ -174,6 +216,8 @@ export default function Chat() {
     Alert.alert('Reported', 'Thank you for your report. We will review it shortly.');
   };
 
+  const safetyTips = isTeen ? TEEN_SAFETY_TIPS : PARENT_SAFETY_TIPS;
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: '#f7faf8' }}
@@ -224,22 +268,52 @@ export default function Chat() {
         </TouchableOpacity>
       </View>
 
-      {/* Safety banner */}
-      {!bannerDismissed && (
+      {/* Pinned safety code — always visible, never dismissable */}
+      {safetyCode && (
         <View style={{
-          backgroundColor: '#f0fdf4',
-          paddingHorizontal: 16, paddingVertical: 9,
-          flexDirection: 'row', alignItems: 'center',
-          borderBottomWidth: 1, borderBottomColor: '#d1fae5',
+          backgroundColor: '#051b0e', borderRadius: 12,
+          margin: 12, marginBottom: 6, padding: 16,
         }}>
-          <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: '#d1fae5', justifyContent: 'center', alignItems: 'center', marginRight: 10 }}>
-            <Ionicons name="shield-checkmark" size={13} color={ds.c.secondary} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <Text style={{ fontSize: 16 }}>🔐</Text>
+            <Text style={{ fontFamily: ds.f.sansBold, fontSize: 12, color: '#86efac', letterSpacing: 1.5, textTransform: 'uppercase' }}>
+              Your Meeting Code
+            </Text>
           </View>
-          <Text style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 12, color: '#065f46', lineHeight: 17 }}>
-            Keep all communication here until you're both comfortable.
+          <Text style={{
+            fontFamily: ds.f.sansBold, fontSize: 22, color: '#fbbf24',
+            textAlign: 'center', letterSpacing: 4, marginBottom: 10,
+          }}>
+            {safetyCode}
           </Text>
-          <TouchableOpacity onPress={() => setBannerDismissed(true)} style={{ marginLeft: 10, padding: 2 }}>
-            <Ionicons name="close" size={15} color="#6b7280" />
+          <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#6b7280', textAlign: 'center', lineHeight: 18 }}>
+            When you meet in person, the teen should say this code to confirm they are the right person for the right job. Do not share this code anywhere else.
+          </Text>
+        </View>
+      )}
+
+      {/* Role-specific safety banner — dismissable, once per job */}
+      {!safetyBannerDismissed && (
+        <View style={{
+          backgroundColor: '#735c00', borderRadius: 12,
+          marginHorizontal: 12, marginBottom: 6, padding: 16,
+        }}>
+          <Text style={{ fontFamily: ds.f.sansBold, fontSize: 14, color: '#fff', marginBottom: 10 }}>
+            Before you meet
+          </Text>
+          {safetyTips.map((tip, i) => (
+            <Text key={i} style={{ fontFamily: ds.f.sans, fontSize: 13, color: '#fef3c7', lineHeight: 20, marginBottom: 4 }}>
+              {'✓ '}{tip}
+            </Text>
+          ))}
+          <TouchableOpacity
+            onPress={dismissSafetyBanner}
+            style={{
+              marginTop: 14, backgroundColor: 'rgba(255,255,255,0.15)',
+              borderRadius: 9999, paddingVertical: 10, alignItems: 'center',
+            }}
+          >
+            <Text style={{ fontFamily: ds.f.sansBold, fontSize: 13, color: '#fff' }}>Got it, I understand</Text>
           </TouchableOpacity>
         </View>
       )}

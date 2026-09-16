@@ -8,37 +8,37 @@ type Step = { icon: string; title: string; body: string };
 
 const TEEN_STEPS: Step[] = [
   {
+    icon: 'person-add-outline',
+    title: 'You\'re registered!',
+    body: 'Your profile is live with your skills, availability, and hourly rate. Parents in your city can already find you.',
+  },
+  {
     icon: 'add-circle-outline',
     title: 'Post your services',
-    body: 'Tap the Post button at the bottom to list what you can do — babysitting, tutoring, yard work, and more.',
+    body: 'Head to the Post tab and list what you can do — babysitting, tutoring, yard work, and more. The more detail, the more jobs you\'ll land.',
   },
   {
-    icon: 'search-outline',
-    title: 'Find jobs nearby',
-    body: 'Browse jobs posted by parents in your neighbourhood and find ones that are a great fit for you.',
-  },
-  {
-    icon: 'chatbubble-ellipses-outline',
-    title: 'Apply & get paid',
-    body: 'Apply for jobs or wait for parents to invite you. Once connected, chat to agree on details and get the job done.',
+    icon: 'briefcase-outline',
+    title: 'Apply or get invited',
+    body: 'Browse jobs posted by parents nearby and apply directly. Parents can also find your profile and invite you — so keep it updated!',
   },
 ];
 
 const PARENT_STEPS: Step[] = [
   {
+    icon: 'person-add-outline',
+    title: 'You\'re registered!',
+    body: 'Your family profile is set up. Teens in your city can already see you\'re looking for help.',
+  },
+  {
     icon: 'add-circle-outline',
     title: 'Post a job',
-    body: 'Tap the Post button at the bottom to describe the job you need — what it is, when, and how much you\'ll pay.',
+    body: 'Head to the Post tab and describe what you need — babysitting, tutoring, yard work, and more. Set your date, time, and pay.',
   },
   {
     icon: 'people-outline',
-    title: 'Browse & invite teens',
-    body: 'Browse teens in your area or invite them directly to your job listing. They can also apply on their own.',
-  },
-  {
-    icon: 'chatbubble-ellipses-outline',
-    title: 'Chat & coordinate',
-    body: 'Once they accept, chat to plan the details — where to meet, when to start, and whatever else you need.',
+    title: 'Hire a teen',
+    body: 'Browse teens in your area and invite them, or wait for teens to apply to your job. Once matched, chat to sort out the details.',
   },
 ];
 

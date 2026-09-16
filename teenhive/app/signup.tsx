@@ -9,6 +9,7 @@ import { useAuth } from '@/context/AuthContext';
 import { ds } from '@/lib/design';
 import { supabase } from '@/lib/supabase';
 import { trackSignUp } from '@/lib/analytics';
+import CityPicker from '@/components/CityPicker';
 
 const SKILLS = ['Babysitting', 'Tutoring', 'Yard Work', 'Pet Care', 'Tech Help', 'Cleaning', 'Errands', 'Car Washing'];
 const AVAIL  = ['Weekdays after school', 'Weekends', 'School holidays', 'Flexible'];
@@ -43,11 +44,14 @@ export default function Signup() {
 
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
-  // Step 3
+  // Step 3 — safety agreements
   const [agreed1, setAgreed1] = useState(false);
   const [agreed2, setAgreed2] = useState(false);
   const [agreed3, setAgreed3] = useState(false);
   const [agreed4, setAgreed4] = useState(false);
+
+  const [showCityPicker, setShowCityPicker] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -88,12 +92,20 @@ export default function Signup() {
         Alert.alert('Error', 'Parents must be 18 or older.');
         return;
       }
+      if (!neighborhood.trim()) {
+        Alert.alert('City required', 'Please select your city so parents and teens can find each other nearby.');
+        return;
+      }
       if (bio.trim().length < 20) {
         Alert.alert('Bio too short', 'Please write a short bio before continuing — at least 20 characters.');
         return;
       }
       if (isTeen && skills.length === 0) {
         Alert.alert('Missing info', 'Please select at least one skill.');
+        return;
+      }
+      if (isTeen && !hourlyRate.trim()) {
+        Alert.alert('Rate required', 'Please enter your hourly rate so parents know what to expect.');
         return;
       }
       setStep(3);
@@ -128,7 +140,6 @@ export default function Signup() {
 
       trackSignUp(data.user.id, (role ?? 'teen') as 'teen' | 'parent');
 
-      // Use SECURITY DEFINER RPC so profile data saves even before email is confirmed
       await supabase.rpc('init_profile', {
         user_id: data.user.id,
         age_val: parseInt(age, 10) || null,
@@ -139,10 +150,9 @@ export default function Signup() {
         availability_val: isTeen ? avail : [],
       });
 
-      // Always show how-it-works first; it then routes to verify-email or tabs
       router.replace({
         pathname: '/how-it-works',
-        params: { role: role ?? 'teen', email: !data.session ? email.trim() : '' },
+        params: { role: role ?? 'teen', email: email.trim() },
       } as any);
     } catch (e: any) {
       Alert.alert('Signup failed', e.message);
@@ -315,20 +325,26 @@ export default function Signup() {
             />
             {ageError ? <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 12, color: '#ef4444', marginTop: 6 }}>{ageError}</Text> : null}
 
-            <Text style={s.label}>NEIGHBOURHOOD <Text style={{ fontFamily: ds.f.sans, color: '#9ca3af', textTransform: 'none', letterSpacing: 0 }}>(optional)</Text></Text>
-            <TextInput
-              style={s.input}
+            <Text style={s.label}>CITY</Text>
+            <TouchableOpacity
+              style={[s.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+              onPress={() => setShowCityPicker(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={{ fontFamily: ds.f.sansMedium, fontSize: 15, color: neighborhood ? '#161d19' : '#9ca3af' }}>
+                {neighborhood || 'Search for your city...'}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color="#737972" />
+            </TouchableOpacity>
+            <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#737972', marginTop: 6 }}>
+              This helps parents and teens find each other nearby
+            </Text>
+            <CityPicker
+              visible={showCityPicker}
               value={neighborhood}
-              onChangeText={(t) => setNeighborhood(t)}
-              placeholder="e.g. Timarron, Oak Park, Westside"
-              placeholderTextColor="#9ca3af"
-              autoCapitalize="words"
-              autoComplete="off"
-              textContentType="none"
-              importantForAutofill="no"
-              returnKeyType="next"
+              onSelect={(city) => { setNeighborhood(city); setShowCityPicker(false); }}
+              onClose={() => setShowCityPicker(false)}
             />
-            <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#737972', marginTop: 6 }}>Just your neighbourhood name (e.g. Timarron) — please do not put your street name or house number here</Text>
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 20, marginBottom: 8 }}>
               <Text style={[s.label, { marginTop: 0, marginBottom: 0 }]}>{isTeen ? 'ABOUT YOU' : 'ABOUT YOUR FAMILY'}</Text>
@@ -351,7 +367,7 @@ export default function Signup() {
 
             {isTeen && (
               <>
-                <Text style={s.label}>HOURLY RATE <Text style={{ fontFamily: ds.f.sans, color: '#9ca3af' }}>(optional)</Text></Text>
+                <Text style={s.label}>HOURLY RATE</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#eef6ef', borderRadius: 12 }}>
                   <Text style={{ paddingLeft: 16, fontSize: 16, color: '#051b0e', fontFamily: ds.f.serifBold }}>$</Text>
                   <TextInput
@@ -492,7 +508,7 @@ export default function Signup() {
               </TouchableOpacity>
             ))}
 
-            <View style={{ backgroundColor: '#eef6ef', borderRadius: 12, padding: 16, marginTop: 8 }}>
+            <View style={{ backgroundColor: '#eef6ef', borderRadius: 12, padding: 16, marginTop: 20 }}>
               <Text style={{ fontFamily: ds.f.sans, fontSize: 13, color: '#737972', lineHeight: 20 }}>
                 By creating an account you agree to our{' '}
                 <Text style={{ fontFamily: ds.f.sansSemiBold, color: '#735c00' }} onPress={() => router.push('/terms' as any)}>Terms of Service</Text>

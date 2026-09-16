@@ -41,3 +41,8 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Metabase (local BI tool, not app code)
+teenhive/metabase.jar
+teenhive/metabase.db.*
+teenhive/plugins/

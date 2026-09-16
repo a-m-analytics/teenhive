@@ -44,6 +44,8 @@ export default function PostJob() {
   const [recurringDays, setRecurringDays] = useState<string[]>([]);
   const [numKids, setNumKids] = useState('');
   const [teensNeeded, setTeensNeeded] = useState(1);
+  const [jobType, setJobType] = useState<'paid' | 'community' | 'quick'>('paid');
+  const [organization, setOrganization] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   // Load existing job for editing
@@ -78,8 +80,20 @@ export default function PostJob() {
   };
 
   const submit = async () => {
-    if (!title.trim() || !category || !payAmount) {
-      Alert.alert('Required fields', 'Fill in title, category, and pay rate.');
+    if (!title.trim() || !category) {
+      Alert.alert('Required fields', 'Please fill in the job title and category.');
+      return;
+    }
+    if (!description.trim()) {
+      Alert.alert('Description required', 'Please describe the job so teens know what to expect.');
+      return;
+    }
+    if (jobType !== 'community' && !payAmount) {
+      Alert.alert('Pay rate required', 'Please enter how much you\'ll pay for this job.');
+      return;
+    }
+    if (!location.trim()) {
+      Alert.alert('Location required', 'Please enter your neighbourhood or area so teens near you can find this job.');
       return;
     }
     if (!user) return;
@@ -99,8 +113,11 @@ export default function PostJob() {
         title: title.trim(),
         category,
         description: description.trim(),
-        pay_rate: parseFloat(payAmount),
+        pay_rate: jobType !== 'community' && payAmount ? parseFloat(payAmount) : null,
         pay_type: payType === 'hr' ? 'hourly' : 'flat',
+        job_type: jobType,
+        is_quick: jobType === 'quick',
+        organization: jobType === 'community' ? organization.trim() || null : null,
         location_area: location.trim() || null,
         date: isoDate,
         start_time: timeStr,
@@ -195,6 +212,58 @@ export default function PostJob() {
             ))}
           </View>
 
+          {/* Job Type */}
+          <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 12 }}>Job Type</Text>
+          <View style={{ gap: 10, marginBottom: 24 }}>
+            {([
+              { value: 'paid', icon: '💰', label: 'Paid Job', desc: 'You pay the teen for their work' },
+              { value: 'community', icon: '💚', label: 'Community / Volunteer', desc: 'No payment — give back to the community' },
+              { value: 'quick', icon: '⚡', label: 'Quick Job', desc: 'Under 2 hours, one simple task' },
+            ] as const).map((opt) => {
+              const active = jobType === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  onPress={() => setJobType(opt.value)}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 14,
+                    backgroundColor: active ? '#eef6ef' : ds.c.surfaceContainerHigh,
+                    borderRadius: 16, padding: 16,
+                    borderWidth: active ? 2 : 1,
+                    borderColor: active ? ds.c.secondary : ds.c.outlineVariant,
+                  }}
+                >
+                  <Text style={{ fontSize: 24 }}>{opt.icon}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontFamily: ds.f.sansBold, fontSize: 14, color: active ? ds.c.primary : ds.c.onSurface }}>{opt.label}</Text>
+                    <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: ds.c.onSurfaceVariant, marginTop: 2 }}>{opt.desc}</Text>
+                  </View>
+                  {active && <Ionicons name="checkmark-circle" size={20} color={ds.c.secondary} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Organization — community only */}
+          {jobType === 'community' && (
+            <>
+              <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 8 }}>Organization <Text style={{ fontFamily: ds.f.sans, textTransform: 'none', letterSpacing: 0, fontSize: 11, color: ds.c.outlineVariant }}>(optional)</Text></Text>
+              <View style={{ ...dsField, marginBottom: 24 }}>
+                <Ionicons name="business-outline" size={18} color={ds.c.onSurfaceVariant} />
+                <TextInput
+                  style={{ flex: 1, fontFamily: ds.f.sans, fontSize: 15, color: ds.c.onSurface }}
+                  placeholder="e.g. City Food Bank, PTA"
+                  placeholderTextColor={ds.c.outlineVariant}
+                  value={organization}
+                  onChangeText={setOrganization}
+                />
+              </View>
+              <View style={{ backgroundColor: '#f0fdf4', borderRadius: 12, padding: 12, marginBottom: 24 }}>
+                <Text style={{ fontFamily: ds.f.sans, fontSize: 12, color: '#065f46' }}>💚 This will appear in the Community section of the home feed.</Text>
+              </View>
+            </>
+          )}
+
           {/* Description */}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
             <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant }}>Description</Text>
@@ -211,37 +280,41 @@ export default function PostJob() {
             />
           </View>
 
-          {/* Pay Rate */}
-          <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 12 }}>Pay Rate</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-            <Text style={{ fontFamily: ds.f.serifBold, fontSize: 24, color: ds.c.primary }}>$</Text>
-            <View style={{ ...dsField, width: 90 }}>
-              <TextInput
-                style={{ flex: 1, fontFamily: ds.f.serifBold, fontSize: 22, color: ds.c.primary, textAlign: 'center' }}
-                placeholder="15"
-                placeholderTextColor={ds.c.outlineVariant}
-                value={payAmount}
-                onChangeText={setPayAmount}
-                keyboardType="number-pad"
-              />
-            </View>
-            {(['hr', 'flat'] as const).map((pt) => (
-              <TouchableOpacity
-                key={pt}
-                style={{
-                  paddingHorizontal: 16, paddingVertical: 12, borderRadius: 9999,
-                  backgroundColor: payType === pt ? ds.c.primary : ds.c.surfaceContainerHigh,
-                  borderWidth: payType === pt ? 0 : 1,
-                  borderColor: ds.c.outlineVariant,
-                }}
-                onPress={() => setPayType(pt)}
-              >
-                <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: payType === pt ? ds.c.white : ds.c.onSurfaceVariant }}>
-                  {pt === 'hr' ? '/hr' : 'Flat'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {/* Pay Rate — hidden for community */}
+          {jobType !== 'community' && (
+            <>
+              <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 12 }}>Pay Rate</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 }}>
+                <Text style={{ fontFamily: ds.f.serifBold, fontSize: 24, color: ds.c.primary }}>$</Text>
+                <View style={{ ...dsField, width: 90 }}>
+                  <TextInput
+                    style={{ flex: 1, fontFamily: ds.f.serifBold, fontSize: 22, color: ds.c.primary, textAlign: 'center' }}
+                    placeholder="15"
+                    placeholderTextColor={ds.c.outlineVariant}
+                    value={payAmount}
+                    onChangeText={setPayAmount}
+                    keyboardType="number-pad"
+                  />
+                </View>
+                {(['hr', 'flat'] as const).map((pt) => (
+                  <TouchableOpacity
+                    key={pt}
+                    style={{
+                      paddingHorizontal: 16, paddingVertical: 12, borderRadius: 9999,
+                      backgroundColor: payType === pt ? ds.c.primary : ds.c.surfaceContainerHigh,
+                      borderWidth: payType === pt ? 0 : 1,
+                      borderColor: ds.c.outlineVariant,
+                    }}
+                    onPress={() => setPayType(pt)}
+                  >
+                    <Text style={{ fontFamily: ds.f.sansSemiBold, fontSize: 13, color: payType === pt ? ds.c.white : ds.c.onSurfaceVariant }}>
+                      {pt === 'hr' ? '/hr' : 'Flat'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </>
+          )}
 
           {/* Date */}
           <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 8 }}>Date <Text style={{ fontFamily: ds.f.sans, textTransform: 'none', letterSpacing: 0, fontSize: 11, color: ds.c.outlineVariant }}>(optional)</Text></Text>
@@ -346,7 +419,7 @@ export default function PostJob() {
           </View>
 
           {/* Location */}
-          <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 8 }}>Location</Text>
+          <Text style={{ ...dsLabel, color: ds.c.onSurfaceVariant, marginBottom: 8 }}>Location <Text style={{ color: '#dc2626' }}>*</Text></Text>
           <View style={{ ...dsField, marginBottom: 24 }}>
             <Ionicons name="location-outline" size={18} color={ds.c.onSurfaceVariant} />
             <TextInput

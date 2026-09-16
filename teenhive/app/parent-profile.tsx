@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 type ParentProfile = {
   id: string;
@@ -16,6 +16,7 @@ type ParentProfile = {
   rating_count: number;
   is_verified: boolean;
   created_at: string;
+  avatar_url: string | null;
 };
 
 type Review = {
@@ -57,7 +58,7 @@ export default function ParentProfileScreen() {
     Promise.all([
       supabase
         .from('profiles')
-        .select('id, full_name, neighborhood, bio, rating, rating_count, is_verified, created_at')
+        .select('id, full_name, neighborhood, bio, rating, rating_count, is_verified, created_at, avatar_url')
         .eq('id', id)
         .single(),
       supabase
@@ -139,7 +140,10 @@ export default function ParentProfileScreen() {
 
           <View style={{ alignItems: 'center' }}>
             <View style={{ width: 90, height: 90, borderRadius: 45, backgroundColor: ds.c.secondaryContainer, justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={{ fontFamily: ds.f.sansBold, fontSize: 32, color: ds.c.primary }}>{initials}</Text>
+              {parent.avatar_url
+                ? <Image source={{ uri: parent.avatar_url }} style={{ width: 90, height: 90, borderRadius: 45 }} />
+                : <Text style={{ fontFamily: ds.f.sansBold, fontSize: 32, color: ds.c.primary }}>{initials}</Text>
+              }
             </View>
             <Text style={{ fontFamily: ds.f.serifBold, fontSize: 36, color: ds.c.white, lineHeight: 42, letterSpacing: -0.3, marginBottom: 8, textAlign: 'center' }}>
               {parent.full_name}
