@@ -3,11 +3,13 @@ import { ds } from '@/lib/design';
 import { supabase } from '@/lib/supabase';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Image, Text, TouchableOpacity, View } from 'react-native';
 
 export default function CompleteProfile() {
   const { user, profile, refreshProfile } = useAuth();
+  const router = useRouter();
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -40,6 +42,9 @@ export default function CompleteProfile() {
       await withTimeout(uploadPhoto(imageUri, user.id), 20000, 'Upload timed out — check your connection and try again.');
       // Refresh profile in context so AuthGate sees the new avatar_url
       await refreshProfile();
+      // AuthGate never redirects away from this screen on its own (complete-profile
+      // is in its SKIP_AVATAR_SCREENS list), so we have to navigate forward ourselves.
+      router.replace('/(tabs)');
     } catch (e: any) {
       Alert.alert('Upload failed', e.message ?? 'Could not upload photo.');
     } finally {
